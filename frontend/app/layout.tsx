@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Bot } from "lucide-react";
+import Link from "next/link";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,13 +31,29 @@ export default function RootLayout({
       >
         {children}
 
-        <footer>
-          <div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
+        <footer className="bg-black mt-14 flex flex-col items-center justify-center gap-6">
+          <div className="flex justify-around items-start pt-6 w-full">
+            <div>
+              <Link href="/" className="flex items-center font-bold text-white">
+                <Bot size={35} className="text-blue-600 mr-1"/> Prep<span className="text-red-700 text-xl">Bot</span>
+              </Link>
+              <p className="text-white/70 text-sm">
+                From coding rounds to HR questions, it provides instant feedback and data-driven <br/> insights to accelerate your career growth.
+              </p>
+            </div>
+            <div className="text-white text-center">
+              <h1 className="font-extrabold mb-2">Important links</h1>
+              <ul className="flex gap-8">
+                <Link href="#work">How it works</Link>
+                <Link href="#pricing">Pricing</Link>
+                <Link href="/help">Help Center</Link>  
+              </ul>
+            </div>
           </div>
+          <hr className="w-[70vw] text-white/40"/>
+          <h2 className="text-white text-sm mb-6">
+            Copyright ©️ {new Date(Date.now()).getFullYear()} PrepBot | All rights reserved
+          </h2>
         </footer>
       </body>
     </html>
