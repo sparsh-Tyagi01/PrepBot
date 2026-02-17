@@ -35,7 +35,7 @@ export default function Home() {
             <button className="mt-10 py-2 px-3 bg-emerald-600 rounded-xl text-white font-bold hover:bg-emerald-700 transition-colors duration-200">Get Started &gt;</button>
           </div>
           <div className="w-[40vw] h-[80vh]">
-            <Image src="/pexels-edmond-dantes-4344878.jpg" width={500} height={500} alt="img" className="object-cover w-full h-full rounded-full shadow-[5px_5px_5px_yellow]"/>
+            <Image src="/professional-lawyer-explaining-reviewing-business-contract-with-female-client-office-caucasian-woman-listening-her-male-boss-talk-about-work-report.jpg" width={500} height={500} alt="img" className="object-cover w-full h-full rounded-full shadow-xl shadow-blue-200 border-t-4 border-green-400"/>
           </div>
         </div>
 

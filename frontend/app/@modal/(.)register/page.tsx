@@ -1,4 +1,7 @@
+"use client"
+
 import { Bot } from "lucide-react";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 
 export default function RegisterModal() {
@@ -29,6 +32,7 @@ export default function RegisterModal() {
                     OR
                     <hr className="w-[15vw] text-gray-300"/>
                 </div>
+                <button onClick={()=>signIn("github")} className="border-2 border-slate-200 rounded-xl px-2 py-1 text-white bg-black w-[25vw] hover:bg-slate-200">Continue with Github</button>
             </div>
         </div>
     )
