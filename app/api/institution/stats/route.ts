@@ -75,7 +75,7 @@ export async function GET() {
         averageScore: Math.round(avgScore),
         customInterviewTypes: interviewTypes,
       },
-      recentSessions: recentSessions.map((s) => ({
+      recentSessions: recentSessions.map((s: typeof recentSessions[number]) => ({
         id: s.id,
         title: s.title,
         studentName: s.user.name,

@@ -82,7 +82,7 @@ export async function GET() {
     }
 
     // Interview history (for analytics table)
-    const interviewHistory = reports.slice(0, 30).map((r) => ({
+    const interviewHistory = reports.slice(0, 30).map((r: typeof reports[number]) => ({
       id: r.id,
       sessionId: r.interviewSessionId,
       date: r.createdAt,
@@ -96,7 +96,7 @@ export async function GET() {
     }));
 
     // Recent sessions (for dashboard)
-    const recentSessions = completedSessions.slice(0, 5).map((s) => ({
+    const recentSessions = completedSessions.slice(0, 5).map((s: typeof completedSessions[number]) => ({
       id: s.id,
       type: s.interviewType.name,
       title: s.title,
