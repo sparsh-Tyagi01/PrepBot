@@ -13,12 +13,12 @@ function Navbar() {
       <Sheet>
         <SheetTrigger className="m-4"><Menu/></SheetTrigger>
         <SheetContent side="left" className="bg-black">
-          <SheetHeader className="flex flex-col items-center">
-            <SheetTitle className="flex items-center gap-2 text-xl text-white"><LayoutDashboard/>Dashboard</SheetTitle>
-            <SheetTitle className="flex items-center gap-2 text-xl text-white"><List/>My Reports</SheetTitle>
-            <SheetTitle className="flex items-center gap-2 text-xl text-white"><Clock/>Analytics</SheetTitle>
-            <SheetTitle className="flex items-center gap-2 text-xl text-white"><Computer/>Skill Gap</SheetTitle>
-            <SheetTitle className="flex items-center gap-2 text-xl text-white"><Settings/>Settings</SheetTitle>
+          <SheetHeader className="flex flex-col items-center gap-12 mt-8">
+            <SheetTitle><Link href={"/dashboard"} className="flex items-center gap-2 text-xl text-white"><LayoutDashboard/>Dashboard</Link></SheetTitle>
+            <SheetTitle><Link href={"/reports"} className="flex items-center gap-2 text-xl text-white"><List/>My Reports</Link></SheetTitle>
+            <SheetTitle><Link href={"/analytics"} className="flex items-center gap-2 text-xl text-white"><Clock/>Analytics</Link></SheetTitle>
+            <SheetTitle><Link href={"/skill"} className="flex items-center gap-2 text-xl text-white"><Computer/>Skill Gap</Link></SheetTitle>
+            <SheetTitle><Link href={"/settings"} className="flex items-center gap-2 text-xl text-white"><Settings/>Settings</Link></SheetTitle>
           </SheetHeader>
         </SheetContent>
     </Sheet>
