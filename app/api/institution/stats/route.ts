@@ -63,10 +63,9 @@ export async function GET() {
       select: { score: true },
     });
 
-    const avgScore =
-      completedSessions.length > 0
-        ? completedSessions.reduce<number>((sum, s) => sum + (s.score ?? 0), 0) / completedSessions.length
-        : 0;
+    let sessionScoreSum = 0;
+    for (const s of completedSessions) sessionScoreSum += (s.score ?? 0);
+    const avgScore = completedSessions.length > 0 ? sessionScoreSum / completedSessions.length : 0;
 
     return NextResponse.json({
       institution,

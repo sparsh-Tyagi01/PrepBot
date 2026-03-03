@@ -25,7 +25,8 @@ export async function GET() {
     });
 
     // Total hours practiced
-    const totalMinutes = completedSessions.reduce<number>((sum, s) => sum + s.duration, 0);
+    let totalMinutes = 0;
+    for (const s of completedSessions) totalMinutes += (s.duration ?? 0);
     const totalHours = parseFloat((totalMinutes / 60).toFixed(1));
 
     // All reports with session details
@@ -104,10 +105,9 @@ export async function GET() {
     }));
 
     // Readiness / overall score
-    const readinessScore =
-      reports.length > 0
-        ? Math.round(reports.reduce<number>((sum, r) => sum + r.overallScore, 0) / reports.length)
-        : 0;
+    let reportsScoreSum = 0;
+    for (const r of reports) reportsScoreSum += (r.overallScore as number);
+    const readinessScore = reports.length > 0 ? Math.round(reportsScoreSum / reports.length) : 0;
 
     return NextResponse.json({
       analytics: { ...analytics, totalHours },
