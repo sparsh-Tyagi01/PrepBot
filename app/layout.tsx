@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "InterviewMatrix - AI-Powered Interview Platform",
+  title: "PrepBot - AI-Powered Interview Platform",
   description: "Master your interview skills with AI-powered mock interviews, real-time feedback, and personalized learning paths. Prepare smarter, perform better.",
   keywords: ["interview preparation", "AI interview", "mock interview", "coding interview", "behavioral interview", "technical interview"],
 };

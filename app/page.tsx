@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,33 +10,35 @@ import {
   PlayCircle, CheckCircle2, ArrowRight, Users, Star, 
   Zap, Shield, Globe, ChevronRight, Mail, Phone, MapPin,
   Linkedin, Twitter, Github, Instagram, MessageSquare, 
-  FileCode, Briefcase, Users2, Network
+  FileCode, Briefcase, Users2, Network, Menu, X,
 } from "lucide-react";
 
 export default function Home() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
     <div className="w-full min-h-screen bg-linear-to-b from-slate-950 via-slate-900 to-slate-950">
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
               <Brain className="text-white" size={24} />
             </div>
             <span className="text-2xl font-bold bg-linear-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-              InterviewMatrix
+              PrepBot
             </span>
           </Link>
-          
+
+          {/* Desktop nav links */}
           <div className="hidden md:flex items-center gap-8 text-slate-300">
             <Link href="#features" className="hover:text-white transition-colors">Features</Link>
             <Link href="#how-it-works" className="hover:text-white transition-colors">How it Works</Link>
             <Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link>
             <Link href="#testimonials" className="hover:text-white transition-colors">Testimonials</Link>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <Link href="/login">
+
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Link href="/login" className="hidden sm:block">
               <Button variant="ghost" size="md">Log in</Button>
             </Link>
             <Link href="/register">
@@ -41,12 +46,43 @@ export default function Home() {
                 Get Started <ArrowRight size={16} />
               </Button>
             </Link>
+            {/* Mobile hamburger */}
+            <button
+              className="md:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+              onClick={() => setMobileMenuOpen(m => !m)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
           </div>
         </div>
+        {/* Mobile dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-800 bg-slate-950/98 backdrop-blur-xl px-4 py-3 space-y-1">
+            {[
+              { href: '#features',     label: 'Features' },
+              { href: '#how-it-works', label: 'How it Works' },
+              { href: '#pricing',      label: 'Pricing' },
+              { href: '#testimonials', label: 'Testimonials' },
+            ].map(link => (
+              <a key={link.href} href={link.href}
+                className="block px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/50 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {link.label}
+              </a>
+            ))}
+            <div className="pt-2 mt-1 border-t border-slate-800">
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                <Button variant="ghost" size="md" className="w-full justify-start">Log in</Button>
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
+      <section className="relative pt-24 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(120,119,198,0.15),transparent_50%)]" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse" />
@@ -59,7 +95,7 @@ export default function Home() {
               AI-Powered Interview Platform
             </Badge>
             
-            <h1 className="text-5xl md:text-7xl font-bold leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold leading-tight">
               <span className="text-white">One Platform.</span><br />
               <span className="bg-linear-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 Multiple AI Interview Experiences.
@@ -140,14 +176,14 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-6 relative">
+      <section id="features" className="py-12 sm:py-20 px-4 sm:px-6 relative">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16 space-y-4">
             <Badge variant="default" className="mx-auto w-fit">
               <Zap size={14} className="mr-1" />
               Powerful Features
             </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">
               Everything You Need to Ace Your Interview
             </h2>
             <p className="text-xl text-slate-400 max-w-2xl mx-auto">
@@ -201,14 +237,14 @@ export default function Home() {
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="py-20 px-6 bg-slate-900/50">
+      <section id="how-it-works" className="py-12 sm:py-20 px-4 sm:px-6 bg-slate-900/50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16 space-y-4">
             <Badge variant="default" className="mx-auto w-fit">
               <Target size={14} className="mr-1" />
               Simple Process
             </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">
               How It Works
             </h2>
             <p className="text-xl text-slate-400 max-w-2xl mx-auto">
@@ -264,14 +300,14 @@ export default function Home() {
       </section>
 
       {/* Interview Categories */}
-      <section className="py-20 px-6">
+      <section className="py-12 sm:py-20 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16 space-y-4">
             <Badge variant="default" className="mx-auto w-fit">
               <Network size={14} className="mr-1" />
               Interview Types
             </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">
               Master Every Interview Format
             </h2>
           </div>
@@ -305,14 +341,14 @@ export default function Home() {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-20 px-6 bg-slate-900/50">
+      <section id="testimonials" className="py-12 sm:py-20 px-4 sm:px-6 bg-slate-900/50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16 space-y-4">
             <Badge variant="default" className="mx-auto w-fit">
               <Users size={14} className="mr-1" />
               Success Stories
             </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">
               Loved by Professionals Worldwide
             </h2>
           </div>
@@ -322,7 +358,7 @@ export default function Home() {
               {
                 name: "Sarah Chen",
                 role: "Software Engineer at Google",
-                content: "InterviewMatrix helped me land my dream job! The AI feedback was incredibly accurate and helped me improve my communication skills.",
+                content: "PrepBot helped me land my dream job! The AI feedback was incredibly accurate and helped me improve my communication skills.",
                 rating: 5
               },
               {
@@ -365,14 +401,14 @@ export default function Home() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-20 px-6">
+      <section id="pricing" className="py-12 sm:py-20 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16 space-y-4">
             <Badge variant="default" className="mx-auto w-fit">
               <Sparkles size={14} className="mr-1" />
               Pricing Plans
             </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">
               Choose Your Plan
             </h2>
             <p className="text-xl text-slate-400">
@@ -423,7 +459,7 @@ export default function Home() {
                 highlight: false
               },
             ].map((plan, i) => (
-              <Card key={i} className={`${plan.highlight ? 'border-purple-500/50 shadow-2xl shadow-purple-500/20 scale-105' : ''} relative`}>
+              <Card key={i} className={`${plan.highlight ? 'border-purple-500/50 shadow-2xl shadow-purple-500/20 md:scale-105' : ''} relative`}>
                 {plan.highlight && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                     <Badge variant="default" className="shadow-lg shadow-purple-500/50">
@@ -465,12 +501,12 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-6">
+      <section className="py-12 sm:py-20 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
           <Card className="relative overflow-hidden">
             <div className="absolute inset-0 bg-linear-to-br from-purple-600/20 via-blue-600/20 to-cyan-600/20" />
             <CardHeader className="text-center relative z-10 space-y-6 py-16">
-              <CardTitle className="text-4xl md:text-5xl">
+              <CardTitle className="text-3xl sm:text-4xl md:text-5xl">
                 Ready to Ace Your Next Interview?
               </CardTitle>
               <CardDescription className="text-xl text-slate-300">
@@ -492,15 +528,15 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800 py-12 px-6 bg-slate-950">
+      <footer className="border-t border-slate-800 py-12 px-4 sm:px-6 bg-slate-950">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center">
                   <Brain className="text-white" size={24} />
                 </div>
-                <span className="text-xl font-bold text-white">InterviewMatrix</span>
+                <span className="text-xl font-bold text-white">PrepBot</span>
               </div>
               <p className="text-slate-400 text-sm">
                 Empowering professionals to succeed in their interview journey with AI-powered preparation.
@@ -547,11 +583,11 @@ export default function Home() {
           
           <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-slate-400 text-sm">
-              © 2026 InterviewMatrix. All rights reserved.
+              © 2026 PrepBot. All rights reserved.
             </p>
             <div className="flex items-center gap-6 text-slate-400 text-sm">
               <span className="flex items-center gap-1">
-                <Mail size={14} /> hello@interviewmatrix.com
+                <Mail size={14} /> hello@prepbot.ai
               </span>
               <span className="flex items-center gap-1">
                 <Globe size={14} /> Global

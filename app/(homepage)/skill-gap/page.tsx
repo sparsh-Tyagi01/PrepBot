@@ -108,7 +108,7 @@ export default function SkillGapPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-4xl font-bold text-white mb-2">Skill Gap Analysis</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Skill Gap Analysis</h1>
         <p className="text-slate-400 text-lg">
           Identify your strengths and weaknesses to create a targeted learning plan
         </p>

@@ -114,7 +114,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Welcome Section */}
       <div>
-        <h1 className="text-4xl font-bold text-white mb-2">
+        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">
           Welcome back,{" "}
           <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             {firstName}!

@@ -60,7 +60,7 @@ export default function InstitutionLoginPage() {
             <Building2 className="text-white" size={28} />
           </div>
           <div className="text-left">
-            <div className="text-xl font-bold text-white">InterviewMatrix</div>
+            <div className="text-xl font-bold text-white">PrepBot</div>
             <div className="text-xs text-blue-400">Institution Portal</div>
           </div>
         </Link>

@@ -157,7 +157,7 @@ function ReportsPageContent() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2">Interview Reports</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Interview Reports</h1>
           <p className="text-slate-400 text-lg">
             Review your past interviews and track your progress
           </p>
@@ -302,7 +302,7 @@ function ReportsPageContent() {
 
       {/* Detail Modal - you can expand this into a separate component */}
       {selectedReport && selectedReport.interviewSession && (
-        <Card className="fixed inset-8 z-50 overflow-auto">
+        <Card className="fixed inset-0 sm:inset-8 z-50 overflow-auto">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>{selectedReport.interviewSession.title || 'Interview Report'}</CardTitle>

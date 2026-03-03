@@ -62,7 +62,7 @@ export default function LoginPage() {
             <Brain className="text-white" size={28} />
           </div>
           <span className="text-3xl font-bold bg-linear-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-            InterviewMatrix
+            PrepBot
           </span>
         </Link>
 

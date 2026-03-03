@@ -1,6 +1,6 @@
 # 🎯 PrepBot
 
-A modern, **full-stack** AI-powered interview preparation platform built with Next.js 16, React 19, PostgreSQL, Prisma, NextAuth.js, and Tailwind CSS v4. InterviewMatrix provides a comprehensive suite of tools for mastering technical interviews through AI-driven mock interviews, detailed analytics, and personalized learning paths.
+A modern, **full-stack** AI-powered interview preparation platform built with Next.js 16, React 19, PostgreSQL, Prisma, NextAuth.js, and Tailwind CSS v4. PrepBot provides a comprehensive suite of tools for mastering technical interviews through AI-driven mock interviews, detailed analytics, and personalized learning paths.
 
 ## 🚀 **NEW: Complete Backend Implementation**
 
@@ -406,4 +406,4 @@ MIT License - feel free to use for personal or commercial projects
 
 ---
 
-**InterviewMatrix** - Master Your Interview Skills with AI 🚀
+**PrepBot** - Master Your Interview Skills with AI 🚀

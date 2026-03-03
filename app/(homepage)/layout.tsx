@@ -132,7 +132,7 @@ export default function DashboardLayout({
         </button>
 
         {/* Page content */}
-        <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">{children}</main>
+        <main className="flex-1 pt-14 pb-8 lg:pt-8 px-4 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>
   );

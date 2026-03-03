@@ -133,7 +133,7 @@ export default function StartInterviewPage() {
   return (
     <div className="max-w-5xl mx-auto pb-10">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="text-4xl font-bold text-white mb-2">Start Interview</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Start Interview</h1>
         <p className="text-slate-400">
           {step === 'type'
             ? 'Select the type of interview you want to practice.'

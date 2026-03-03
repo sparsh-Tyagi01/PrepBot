@@ -178,7 +178,7 @@ export default function SettingsPage() {
     <div className="space-y-8 max-w-4xl">
       {/* Header */}
       <div>
-        <h1 className="text-4xl font-bold text-white mb-2">Settings</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Settings</h1>
         <p className="text-slate-400 text-lg">Manage your account preferences and settings</p>
       </div>
 
