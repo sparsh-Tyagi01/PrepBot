@@ -78,7 +78,7 @@ export default function UserVideo({
   };
 
   return (
-    <div className="relative w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
+    <div className="relative w-full h-full bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
       {/* Video element */}
       {isVideoOn && hasPermission ? (
         <video
@@ -96,7 +96,7 @@ export default function UserVideo({
             <div className="absolute inset-0 rounded-full bg-slate-700/30 blur-lg" />
             
             {/* Avatar placeholder */}
-            <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border-4 border-slate-600 flex items-center justify-center shadow-xl">
+            <div className="relative w-32 h-32 rounded-full bg-linear-to-br from-slate-700 to-slate-800 border-4 border-slate-600 flex items-center justify-center shadow-xl">
               <User className="text-slate-400" size={48} />
             </div>
           </div>
@@ -106,7 +106,7 @@ export default function UserVideo({
       )}
 
       {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
 
       {/* User name label */}
       <div className="absolute bottom-4 left-4 px-3 py-1.5 bg-slate-900/80 backdrop-blur-sm rounded-lg border border-slate-700">

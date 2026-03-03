@@ -108,7 +108,7 @@ export default function InstitutionStudentsPage() {
                       <p className="text-sm font-semibold text-white">{student._count.interviewSessions}</p>
                       <p className="text-xs text-slate-500">interviews</p>
                     </div>
-                    <div className="text-xs text-slate-500 flex items-center gap-1 hidden md:flex">
+                    <div className="text-xs text-slate-500 items-center gap-1 hidden md:flex">
                       <Calendar size={10} />
                       {new Date(student.createdAt).toLocaleDateString()}
                     </div>

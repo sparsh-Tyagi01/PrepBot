@@ -65,7 +65,7 @@ export async function GET() {
 
     const avgScore =
       completedSessions.length > 0
-        ? completedSessions.reduce((sum, s) => sum + (s.score ?? 0), 0) / completedSessions.length
+        ? completedSessions.reduce((sum: number, s) => sum + (s.score ?? 0), 0) / completedSessions.length
         : 0;
 
     return NextResponse.json({
