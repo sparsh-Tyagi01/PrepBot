@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  User, Lock, Crown, Check, Bell, Save, AlertCircle,
+  User, Lock, Crown, Check, Bell, Save, AlertCircle, Building2, CheckCircle, LogOut as LeaveIcon,
 } from "lucide-react";
 
 interface UserProfile {
@@ -15,6 +15,7 @@ interface UserProfile {
   name: string;
   email: string;
   role: string;
+  institution?: { id: string; name: string; joinCode: string } | null;
 }
 
 export default function SettingsPage() {
@@ -34,6 +35,80 @@ export default function SettingsPage() {
     weekly: true,
     marketing: false,
   });
+
+  // Institution join/leave state
+  const [instCode, setInstCode] = useState("");
+  const [instPreview, setInstPreview] = useState<{ name: string } | null>(null);
+  const [instCodeError, setInstCodeError] = useState("");
+  const [instCodeChecking, setInstCodeChecking] = useState(false);
+  const [instLoading, setInstLoading] = useState(false);
+  const [instMsg, setInstMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const instTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleInstCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase().slice(0, 6);
+    setInstCode(val);
+    setInstPreview(null);
+    setInstCodeError("");
+    if (instTimerRef.current) clearTimeout(instTimerRef.current);
+    if (val.length === 6) {
+      setInstCodeChecking(true);
+      instTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/institution/join?code=${val}`);
+          const data = await res.json();
+          if (res.ok && data.institution) {
+            setInstPreview(data.institution);
+          } else {
+            setInstCodeError("Invalid code. Check with your institution admin.");
+          }
+        } catch {
+          setInstCodeError("Could not verify code.");
+        } finally {
+          setInstCodeChecking(false);
+        }
+      }, 500);
+    }
+  };
+
+  const handleJoinInstitution = async () => {
+    if (!instPreview) return;
+    setInstLoading(true);
+    setInstMsg(null);
+    try {
+      const res = await fetch("/api/institution/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: instCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to join institution");
+      setProfile((p) => p ? { ...p, institution: data.institution } : p);
+      setInstCode("");
+      setInstPreview(null);
+      setInstMsg({ type: "success", text: `Successfully joined ${data.institution.name}!` });
+    } catch (err: unknown) {
+      setInstMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to join." });
+    } finally {
+      setInstLoading(false);
+    }
+  };
+
+  const handleLeaveInstitution = async () => {
+    if (!confirm("Are you sure you want to leave your institution?")) return;
+    setInstLoading(true);
+    setInstMsg(null);
+    try {
+      const res = await fetch("/api/institution/join", { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to leave institution");
+      setProfile((p) => p ? { ...p, institution: null } : p);
+      setInstMsg({ type: "success", text: "You have left the institution." });
+    } catch (err: unknown) {
+      setInstMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to leave." });
+    } finally {
+      setInstLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/user")
@@ -119,7 +194,7 @@ export default function SettingsPage() {
         <CardContent>
           <form onSubmit={handleSaveProfile} className="space-y-6">
             <div className="flex items-center gap-6">
-              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
+              <div className="w-24 h-24 rounded-2xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
                 <User size={40} className="text-white" />
               </div>
               <div>
@@ -277,7 +352,7 @@ export default function SettingsPage() {
 
       {/* Subscription Plan */}
       <Card className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 via-blue-600/10 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-br from-purple-600/10 via-blue-600/10 to-transparent" />
         <CardHeader className="relative">
           <div className="flex items-center justify-between">
             <div>
@@ -310,6 +385,102 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Institution */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Building2 className="text-blue-400" size={24} />
+            Institution
+          </CardTitle>
+          <CardDescription>Join or leave your institution</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {profileLoading ? (
+            <Skeleton className="h-20 w-full rounded-xl" />
+          ) : profile?.institution ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <Building2 size={24} className="text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-white">{profile.institution.name}</p>
+                  <p className="text-xs text-slate-400">You are a member of this institution</p>
+                </div>
+                <CheckCircle size={20} className="text-emerald-400" />
+              </div>
+              {instMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${
+                  instMsg.type === "success"
+                    ? "bg-green-500/10 border border-green-500/30 text-green-400"
+                    : "bg-red-500/10 border border-red-500/30 text-red-400"
+                }`}>
+                  {instMsg.type === "success" ? <Check size={16} /> : <AlertCircle size={16} />}
+                  {instMsg.text}
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="md"
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                onClick={handleLeaveInstitution}
+                disabled={instLoading}
+              >
+                <LeaveIcon size={16} />
+                {instLoading ? "Leaving..." : "Leave Institution"}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-400">
+                Enter the join code provided by your institution admin to link your account.
+              </p>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Institution code (e.g. X7K4RM)"
+                    value={instCode}
+                    onChange={handleInstCodeChange}
+                    maxLength={6}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-800/60 border border-slate-700 rounded-xl text-white placeholder-slate-500 uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
+                  />
+                </div>
+                {instCodeChecking && <p className="text-xs text-slate-400">Verifying code...</p>}
+                {instPreview && (
+                  <div className="text-xs text-emerald-400 flex items-center gap-1">
+                    <CheckCircle size={12} /> Joining: {instPreview.name}
+                  </div>
+                )}
+                {instCodeError && <p className="text-xs text-red-400">{instCodeError}</p>}
+              </div>
+              {instMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${
+                  instMsg.type === "success"
+                    ? "bg-green-500/10 border border-green-500/30 text-green-400"
+                    : "bg-red-500/10 border border-red-500/30 text-red-400"
+                }`}>
+                  {instMsg.type === "success" ? <Check size={16} /> : <AlertCircle size={16} />}
+                  {instMsg.text}
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={handleJoinInstitution}
+                disabled={instLoading || !instPreview}
+              >
+                <Building2 size={16} />
+                {instLoading ? "Joining..." : "Join Institution"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

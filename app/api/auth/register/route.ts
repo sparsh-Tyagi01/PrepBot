@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, name, role } = body;
+    const { email, password, name, role, institutionCode } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -14,9 +14,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
     if (existingUser) {
@@ -26,25 +28,37 @@ export async function POST(request: Request) {
       );
     }
 
+    // Resolve institution if code provided
+    let institutionId: string | undefined;
+    if (institutionCode) {
+      const code = institutionCode.toUpperCase().trim();
+      const institution = await prisma.institution.findUnique({ where: { joinCode: code } });
+      if (!institution) {
+        return NextResponse.json({ error: "Invalid institution code" }, { status: 400 });
+      }
+      institutionId = institution.id;
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Create user
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         name,
         password: hashedPassword,
         role: role || "student",
+        ...(institutionId ? { institutionId } : {}),
       },
     });
 
-    // Create analytics record for the user
-    await prisma.analytics.create({
-      data: {
-        userId: user.id,
-      },
-    });
+    // Create analytics record — non-fatal (analytics API will create it on first load if missing)
+    try {
+      await prisma.analytics.create({ data: { userId: user.id } });
+    } catch (analyticsError) {
+      console.warn("Analytics record creation failed (non-fatal):", analyticsError);
+    }
 
     return NextResponse.json(
       {

@@ -2,15 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Mail, Lock, ArrowRight, Chrome } from "lucide-react";
+import { Brain, Mail, Lock, ArrowRight, Github } from "lucide-react";
 
 export default function LoginModal() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -34,19 +32,19 @@ export default function LoginModal() {
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      // Hard redirect — clears the intercepting modal slot entirely
+      window.location.href = "/dashboard";
     } catch (error) {
       setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGithubSignIn = async () => {
     try {
-      await signIn("google", { callbackUrl: "/dashboard" });
+      await signIn("github", { callbackUrl: "/dashboard" });
     } catch (error) {
-      setError("Failed to sign in with Google");
+      setError("Failed to sign in with GitHub");
     }
   };
 
@@ -54,10 +52,10 @@ export default function LoginModal() {
     <div className="w-full max-w-md">
       {/* Logo */}
       <Link href="/" className="flex items-center justify-center gap-2 mb-8 group">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
+        <div className="w-12 h-12 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
           <Brain className="text-white" size={28} />
         </div>
-        <span className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+        <span className="text-3xl font-bold bg-linear-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
           InterviewMatrix
         </span>
       </Link>
@@ -132,18 +130,24 @@ export default function LoginModal() {
             </div>
           </div>
 
-          <Button variant="secondary" size="lg" className="w-full" onClick={handleGoogleSignIn} type="button">
-            <Chrome size={18} />
-            Sign in with Google
+          <Button variant="secondary" size="lg" className="w-full" onClick={handleGithubSignIn} type="button">
+            <Github size={18} />
+            Sign in with GitHub
           </Button>
         </CardContent>
 
-        <CardFooter className="flex-col space-y-4">
+        <CardFooter className="flex-col space-y-3">
           <div className="text-sm text-center text-slate-400">
             Don&apos;t have an account?{" "}
             <Link href="/register" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
               Sign up for free
             </Link>
+          </div>
+          <div className="w-full border-t border-slate-800 pt-3 text-sm text-center text-slate-500">
+            Are you an institution?{" "}
+            <a href="/institution/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+              Institution Login
+            </a>
           </div>
         </CardFooter>
       </Card>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { 
   Brain, LayoutDashboard, PlayCircle, FileText, BarChart3, 
   Target, Settings, LogOut, Menu, X, ChevronDown, User, Bell
@@ -28,7 +29,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Sidebar for mobile */}
       <div
         className={`fixed inset-0 z-50 lg:hidden ${
@@ -42,7 +43,7 @@ export default function DashboardLayout({
         <div className="fixed inset-y-0 left-0 w-72 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800">
           <div className="flex items-center justify-between p-6">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center">
                 <Brain className="text-white" size={24} />
               </div>
               <span className="text-xl font-bold text-white">PrepBot</span>
@@ -60,7 +61,7 @@ export default function DashboardLayout({
                   href={item.href}
                   className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
                     isActive
-                      ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/30"
+                      ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/30"
                       : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                   }`}
                   onClick={() => setSidebarOpen(false)}
@@ -79,10 +80,10 @@ export default function DashboardLayout({
         <div className="flex flex-col flex-1 min-h-0 bg-slate-900/50 backdrop-blur-xl border-r border-slate-800">
           <div className="flex items-center gap-2 p-6">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
                 <Brain className="text-white" size={24} />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+              <span className="text-xl font-bold bg-linear-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                 PrepBot
               </span>
             </Link>
@@ -96,7 +97,7 @@ export default function DashboardLayout({
                   href={item.href}
                   className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
                     isActive
-                      ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/30"
+                      ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/30"
                       : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                   }`}
                 >
@@ -107,7 +108,7 @@ export default function DashboardLayout({
             })}
           </nav>
           <div className="p-4">
-            <Button variant="outline" size="md" className="w-full justify-start gap-3">
+            <Button variant="outline" size="md" className="w-full justify-start gap-3" onClick={() => signOut({ callbackUrl: "/login" })}>
               <LogOut size={20} />
               <span>Logout</span>
             </Button>
@@ -140,7 +141,7 @@ export default function DashboardLayout({
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="flex items-center gap-2 p-2 rounded-2xl hover:bg-slate-800/50 transition-colors"
               >
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center">
                   <User size={16} className="text-white" />
                 </div>
                 <div className="hidden md:block text-left">
@@ -170,7 +171,7 @@ export default function DashboardLayout({
                         className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 rounded-xl hover:bg-red-500/10 hover:text-red-300 transition-colors w-full"
                         onClick={() => {
                           setProfileOpen(false);
-                          // Handle logout
+                          signOut({ callbackUrl: "/login" });
                         }}
                       >
                         <LogOut size={16} />

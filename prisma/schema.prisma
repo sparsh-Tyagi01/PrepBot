@@ -21,6 +21,7 @@ model Institution {
   address         String?
   phone           String?
   type            String    @default("university") // university, college, organization, company
+  joinCode        String    @unique @default(cuid()) // Short code students use to join
   isActive        Boolean   @default(true)
   subscriptionId  String?   @unique
   createdAt       DateTime  @default(now())

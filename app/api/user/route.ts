@@ -23,6 +23,8 @@ export async function GET(request: Request) {
         role: true,
         image: true,
         createdAt: true,
+        institutionId: true,
+        institution: { select: { id: true, name: true, joinCode: true } },
       },
     });
 

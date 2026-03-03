@@ -2,15 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Mail, Lock, ArrowRight, Chrome } from "lucide-react";
+import { Brain, Mail, Lock, ArrowRight, Github } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -34,24 +32,24 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      // Hard redirect ensures session is fully hydrated
+      window.location.href = "/dashboard";
     } catch (error) {
       setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGithubSignIn = async () => {
     try {
-      await signIn("google", { callbackUrl: "/dashboard" });
+      await signIn("github", { callbackUrl: "/dashboard" });
     } catch (error) {
-      setError("Failed to sign in with Google");
+      setError("Failed to sign in with GitHub");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(120,119,198,0.15),transparent_50%)]" />
       <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse" />
@@ -60,10 +58,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <Link href="/" className="flex items-center justify-center gap-2 mb-8 group">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
+          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
             <Brain className="text-white" size={28} />
           </div>
-          <span className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+          <span className="text-3xl font-bold bg-linear-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             InterviewMatrix
           </span>
         </Link>
@@ -138,9 +136,9 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button variant="secondary" size="lg" className="w-full" onClick={handleGoogleSignIn} type="button">
-              <Chrome size={18} />
-              Sign in with Google
+            <Button variant="secondary" size="lg" className="w-full" onClick={handleGithubSignIn} type="button">
+              <Github size={18} />
+              Sign in with GitHub
             </Button>
           </CardContent>
 
@@ -149,6 +147,12 @@ export default function LoginPage() {
               Don&apos;t have an account?{" "}
               <Link href="/register" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
                 Sign up for free
+              </Link>
+            </div>
+            <div className="text-sm text-center text-slate-400">
+              Are you an institution?{" "}
+              <Link href="/institution/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+                Institution Login
               </Link>
             </div>
           </CardFooter>

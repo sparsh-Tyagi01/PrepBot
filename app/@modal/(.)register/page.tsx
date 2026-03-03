@@ -1,24 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Mail, Lock, User, ArrowRight, Chrome, GraduationCap, Briefcase } from "lucide-react";
+import { Brain, Mail, Lock, User, ArrowRight, Github, GraduationCap, Briefcase, Building2, CheckCircle } from "lucide-react";
 
 export default function RegisterModal() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    role: "student" as "student" | "professional"
+    role: "student" as "student" | "professional",
+    institutionCode: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [institutionPreview, setInstitutionPreview] = useState<{ name: string } | null>(null);
+  const [codeError, setCodeError] = useState("");
+  const [codeChecking, setCodeChecking] = useState(false);
+  const codeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase().slice(0, 6);
+    setFormData((f) => ({ ...f, institutionCode: val }));
+    setInstitutionPreview(null);
+    setCodeError("");
+    if (codeTimerRef.current) clearTimeout(codeTimerRef.current);
+    if (val.length === 6) {
+      setCodeChecking(true);
+      codeTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/institution/join?code=${val}`);
+          const data = await res.json();
+          if (res.ok && data.institution) {
+            setInstitutionPreview(data.institution);
+          } else {
+            setCodeError("Invalid institution code.");
+          }
+        } catch {
+          setCodeError("Could not verify code.");
+        } finally {
+          setCodeChecking(false);
+        }
+      }, 500);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +61,7 @@ export default function RegisterModal() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, institutionCode: formData.institutionCode || undefined }),
       });
 
       const data = await response.json();
@@ -56,19 +85,19 @@ export default function RegisterModal() {
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      // Hard redirect — clears the intercepting modal slot entirely
+      window.location.href = "/dashboard";
     } catch (error) {
       setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGithubSignIn = async () => {
     try {
-      await signIn("google", { callbackUrl: "/dashboard" });
+      await signIn("github", { callbackUrl: "/dashboard" });
     } catch (error) {
-      setError("Failed to sign in with Google");
+      setError("Failed to sign in with GitHub");
     }
   };
 
@@ -76,10 +105,10 @@ export default function RegisterModal() {
     <div className="w-full max-w-md max-h-[90vh] overflow-y-auto">
       {/* Logo */}
       <Link href="/" className="flex items-center justify-center gap-2 mb-8 group">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
+        <div className="w-12 h-12 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
           <Brain className="text-white" size={28} />
         </div>
-        <span className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+        <span className="text-3xl font-bold bg-linear-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
           InterviewMatrix
         </span>
       </Link>
@@ -186,6 +215,36 @@ export default function RegisterModal() {
               </div>
             </div>
 
+            {/* Optional: Institution Code (students only) */}
+            {formData.role === "student" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">
+                  Institution Code{" "}
+                  <span className="text-slate-500 font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <Input
+                    type="text"
+                    placeholder="e.g. X7K4RM"
+                    value={formData.institutionCode}
+                    onChange={handleCodeChange}
+                    className="pl-10 uppercase tracking-widest"
+                    maxLength={6}
+                  />
+                </div>
+                {codeChecking && (
+                  <p className="text-xs text-slate-400">Verifying code...</p>
+                )}
+                {institutionPreview && (
+                  <div className="text-xs text-emerald-400 flex items-center gap-1">
+                    <CheckCircle size={12} /> Joining: {institutionPreview.name}
+                  </div>
+                )}
+                {codeError && <p className="text-xs text-red-400">{codeError}</p>}
+              </div>
+            )}
+
             <Button type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
               {loading ? "Creating Account..." : "Create Account"} <ArrowRight size={18} />
             </Button>
@@ -200,18 +259,24 @@ export default function RegisterModal() {
             </div>
           </div>
 
-          <Button variant="secondary" size="lg" className="w-full" onClick={handleGoogleSignIn} type="button">
-            <Chrome size={18} />
-            Sign up with Google
+          <Button variant="secondary" size="lg" className="w-full" onClick={handleGithubSignIn} type="button">
+            <Github size={18} />
+            Sign up with GitHub
           </Button>
         </CardContent>
 
-        <CardFooter className="flex-col space-y-4">
+        <CardFooter className="flex-col space-y-3">
           <div className="text-sm text-center text-slate-400">
             Already have an account?{" "}
             <Link href="/login" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
               Sign in
             </Link>
+          </div>
+          <div className="w-full border-t border-slate-800 pt-3 text-sm text-center text-slate-500">
+            Registering an institution?{" "}
+            <a href="/institution/register" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+              Institution Sign Up
+            </a>
           </div>
         </CardFooter>
       </Card>

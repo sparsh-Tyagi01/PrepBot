@@ -1,7 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GithubProvider from "next-auth/providers/github";
-import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
@@ -17,16 +16,21 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.error("[auth] Missing credentials");
           throw new Error("Invalid credentials");
         }
 
         const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
-          }
+          where: { email: credentials.email.toLowerCase().trim() }
         });
 
-        if (!user || !user.password) {
+        if (!user) {
+          console.error("[auth] No user found for email:", credentials.email);
+          throw new Error("Invalid credentials");
+        }
+
+        if (!user.password) {
+          console.error("[auth] User has no password (OAuth-only account):", credentials.email);
           throw new Error("Invalid credentials");
         }
 
@@ -36,6 +40,7 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isCorrectPassword) {
+          console.error("[auth] Password mismatch for:", credentials.email);
           throw new Error("Invalid credentials");
         }
 
@@ -51,10 +56,6 @@ export const authOptions: NextAuthOptions = {
     GithubProvider({
       clientId: process.env.GITHUB_CLIENT_ID || "",
       clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
   ],
   pages: {
