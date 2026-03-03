@@ -160,8 +160,8 @@ export default function InstitutionInterviewsPage() {
                   <h3 className="font-semibold text-white mb-1">{type.name}</h3>
                   <p className="text-sm text-slate-400 mb-4 line-clamp-2">{type.description ?? "No description"}</p>
                   <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
-                    <span>{type._count.questionBanks} question bank{type._count.questionBanks !== 1 ? "s" : ""}</span>
-                    <span>{type._count.interviewSessions} sessions</span>
+                    <span>{type._count?.questionBanks ?? 0} question bank{(type._count?.questionBanks ?? 0) !== 1 ? "s" : ""}</span>
+                    <span>{type._count?.interviewSessions ?? 0} sessions</span>
                   </div>
                   <Link href={`/institution/question-banks?typeId=${type.id}`}>
                     <Button size="sm" variant="outline" className="w-full gap-2 border-slate-700 hover:border-blue-500/50 group-hover:text-blue-400">

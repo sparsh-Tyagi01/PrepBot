@@ -145,6 +145,15 @@ Provide ONLY the JSON response, no additional text.`;
     // Update user analytics
     await updateUserAnalytics(session.user.id, reportData.score || 0);
 
+    // Update institution analytics if student belongs to one
+    const userRecord = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { institutionId: true },
+    });
+    if (userRecord?.institutionId) {
+      await updateInstitutionAnalytics(userRecord.institutionId, reportData.score || 0);
+    }
+
     return NextResponse.json(report);
   } catch (error: any) {
     console.error('Error generating report:', error);
@@ -154,6 +163,33 @@ Provide ONLY the JSON response, no additional text.`;
       status === 401 || status === 403 ? 'AI API key is invalid or unauthorised.' :
       'Failed to generate report';
     return NextResponse.json({ error: message }, { status });
+  }
+}
+
+async function updateInstitutionAnalytics(institutionId: string, score: number) {
+  try {
+    const existing = await prisma.institutionAnalytics.findUnique({ where: { institutionId } });
+    if (existing) {
+      const newTotal = existing.totalInterviews + 1;
+      const newAvg = (existing.averageScore * existing.totalInterviews + score) / newTotal;
+      await prisma.institutionAnalytics.update({
+        where: { institutionId },
+        data: {
+          totalInterviews: newTotal,
+          averageScore: newAvg,
+        },
+      });
+    } else {
+      await prisma.institutionAnalytics.create({
+        data: {
+          institutionId,
+          totalInterviews: 1,
+          averageScore: score,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Error updating institution analytics:', error);
   }
 }
 

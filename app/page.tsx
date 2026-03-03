@@ -12,15 +12,15 @@ import {
 
 export default function Home() {
   return (
-    <div className="w-full min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <div className="w-full min-h-screen bg-linear-to-b from-slate-950 via-slate-900 to-slate-950">
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
+            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-all duration-300">
               <Brain className="text-white" size={24} />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            <span className="text-2xl font-bold bg-linear-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               InterviewMatrix
             </span>
           </Link>
@@ -61,7 +61,7 @@ export default function Home() {
             
             <h1 className="text-5xl md:text-7xl font-bold leading-tight">
               <span className="text-white">One Platform.</span><br />
-              <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 Multiple AI Interview Experiences.
               </span>
             </h1>
@@ -87,7 +87,7 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 <div className="flex -space-x-2">
                   {[1,2,3,4].map(i => (
-                    <div key={i} className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 border-2 border-slate-900" />
+                    <div key={i} className="w-10 h-10 rounded-full bg-linear-to-br from-purple-500 to-blue-500 border-2 border-slate-900" />
                   ))}
                 </div>
                 <div className="text-sm">
@@ -111,9 +111,9 @@ export default function Home() {
                   <Badge variant="success">Live Interview</Badge>
                   <span className="text-slate-400 text-sm">12:34 / 45:00</span>
                 </div>
-                <div className="h-64 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl flex items-center justify-center border border-slate-700">
+                <div className="h-64 bg-linear-to-br from-slate-900 to-slate-800 rounded-2xl flex items-center justify-center border border-slate-700">
                   <div className="text-center space-y-4">
-                    <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center animate-pulse">
+                    <div className="w-20 h-20 mx-auto rounded-full bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center animate-pulse">
                       <Brain size={40} className="text-white" />
                     </div>
                     <p className="text-slate-300 text-lg">AI Interviewer is asking...</p>
@@ -184,7 +184,7 @@ export default function Home() {
             ].map((feature, i) => (
               <Card key={i} className="group hover:scale-[1.02] cursor-pointer">
                 <CardHeader>
-                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300`}>
+                  <div className={`w-14 h-14 rounded-2xl bg-linear-to-br ${feature.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300`}>
                     <feature.icon className="text-white" size={28} />
                   </div>
                   <CardTitle className="text-xl">{feature.title}</CardTitle>
@@ -239,14 +239,14 @@ export default function Home() {
             ].map((item, i) => (
               <div key={i} className="relative">
                 {i < 2 && (
-                  <div className="hidden md:block absolute top-1/4 left-full w-full h-0.5 bg-gradient-to-r from-purple-600 to-transparent -z-10" />
+                  <div className="hidden md:block absolute top-1/4 left-full w-full h-0.5 bg-linear-to-r from-purple-600 to-transparent -z-10" />
                 )}
                 <Card className="text-center h-full">
                   <CardHeader>
-                    <div className="text-6xl font-bold bg-gradient-to-br from-purple-600 to-blue-600 bg-clip-text text-transparent mb-4">
+                    <div className="text-6xl font-bold bg-linear-to-br from-purple-600 to-blue-600 bg-clip-text text-transparent mb-4">
                       {item.step}
                     </div>
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
                       <item.icon className="text-white" size={32} />
                     </div>
                     <CardTitle className="text-xl">{item.title}</CardTitle>
@@ -285,7 +285,7 @@ export default function Home() {
             ].map((category, i) => (
               <Card key={i} className="group cursor-pointer hover:scale-[1.05] transition-all duration-300">
                 <CardHeader className="text-center">
-                  <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-${category.color}-600 to-${category.color}-500 flex items-center justify-center shadow-xl`}>
+                  <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl bg-linear-to-br from-${category.color}-600 to-${category.color}-500 flex items-center justify-center shadow-xl`}>
                     <category.icon className="text-white" size={40} />
                   </div>
                   <CardTitle className="text-2xl">{category.title}</CardTitle>
@@ -351,7 +351,7 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-blue-600" />
+                    <div className="w-12 h-12 rounded-full bg-linear-to-br from-purple-600 to-blue-600" />
                     <div>
                       <div className="font-semibold text-white">{testimonial.name}</div>
                       <div className="text-sm text-slate-400">{testimonial.role}</div>
@@ -443,7 +443,7 @@ export default function Home() {
                   <div className="space-y-3">
                     {plan.features.map((feature, j) => (
                       <div key={j} className="flex items-center gap-2 text-slate-300">
-                        <CheckCircle2 size={18} className="text-green-400 flex-shrink-0" />
+                        <CheckCircle2 size={18} className="text-green-400 shrink-0" />
                         <span className="text-sm">{feature}</span>
                       </div>
                     ))}
@@ -468,7 +468,7 @@ export default function Home() {
       <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto">
           <Card className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 via-blue-600/20 to-cyan-600/20" />
+            <div className="absolute inset-0 bg-linear-to-br from-purple-600/20 via-blue-600/20 to-cyan-600/20" />
             <CardHeader className="text-center relative z-10 space-y-6 py-16">
               <CardTitle className="text-4xl md:text-5xl">
                 Ready to Ace Your Next Interview?
@@ -497,7 +497,7 @@ export default function Home() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center">
                   <Brain className="text-white" size={24} />
                 </div>
                 <span className="text-xl font-bold text-white">InterviewMatrix</span>

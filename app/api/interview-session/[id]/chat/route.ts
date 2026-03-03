@@ -41,7 +41,7 @@ function buildSystemPrompt(s: {
   interviewType: { name: string };
   difficulty: string;
   duration: number;
-}, timeRemainingSeconds?: number): string {
+}, timeRemainingSeconds?: number, institutionQuestions?: { question: string; expectedAnswer?: string | null; keyPoints?: unknown }[]): string {
   const t = s.interviewType.name;
   const specific: Record<string, string> = {
     'Technical Interview':
@@ -71,12 +71,30 @@ function buildSystemPrompt(s: {
     }
   }
 
+  // Institution-specific question bank
+  let questionBankSection = '';
+  if (institutionQuestions && institutionQuestions.length > 0) {
+    const qList = institutionQuestions
+      .map((q, i) => {
+        let line = `${i + 1}. ${q.question}`;
+        if (q.expectedAnswer) line += `\n   Expected answer guidance: ${q.expectedAnswer}`;
+        const kp = q.keyPoints as string[] | null;
+        if (Array.isArray(kp) && kp.length > 0) line += `\n   Key points to probe: ${kp.join(', ')}`;
+        return line;
+      })
+      .join('\n\n');
+    questionBankSection =
+      `\n\nINSTITUTION QUESTION BANK — you MUST work through these questions in order. ` +
+      `Cover all of them within the available time. Do not skip any unless time runs out:\n\n${qList}`;
+  }
+
   return (
     `You are ${s.aiInterviewer.name}, a professional interviewer at a top-tier tech company.` +
     ` You are conducting a ${t} interview. Difficulty: ${s.difficulty}. Duration: ${s.duration} minutes.\n\n` +
     `Persona: ${s.aiInterviewer.personality} — ${s.aiInterviewer.description ?? ''}\n\n` +
     `Type-specific instructions:\n${specific[t] ?? 'Conduct a thorough professional interview.'}\n\n` +
-    `STRICT rules — apply on EVERY single turn:\n` +
+    questionBankSection +
+    `\n\nSTRICT rules — apply on EVERY single turn:\n` +
     `1. Speak naturally like a real human interviewer. No robotic language.\n` +
     `2. NEVER use markdown, bullet points, bold text, or numbered lists. Plain prose only.\n` +
     `3. Ask EXACTLY ONE question per response.\n` +
@@ -137,8 +155,32 @@ export async function POST(
 
     // systemInstruction ensures the AI has full context on EVERY turn
     const apiKey = process.env.GEMINI_API_KEY || '';
+
+    // Fetch institution question bank for this interview type (if applicable)
+    let institutionQuestions: { question: string; expectedAnswer?: string | null; keyPoints?: unknown }[] = [];
+    const userData = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { institutionId: true },
+    });
+    if (userData?.institutionId) {
+      const banks = await prisma.questionBank.findMany({
+        where: {
+          institutionId: userData.institutionId,
+          interviewTypeId: iv.interviewTypeId,
+          isActive: true,
+        },
+        include: {
+          questions: {
+            where: { isActive: true },
+            orderBy: { order: 'asc' },
+          },
+        },
+      });
+      institutionQuestions = banks.flatMap((b) => b.questions);
+    }
+
     const aiText = (
-      await callGemini(apiKey, buildSystemPrompt(iv, timeRemainingSeconds), history, toSend)
+      await callGemini(apiKey, buildSystemPrompt(iv, timeRemainingSeconds, institutionQuestions.length > 0 ? institutionQuestions : undefined), history, toSend)
     ) || 'Could you tell me a bit more about your background?';
 
     log.push({ speaker: 'ai', message: aiText, type: 'text', timestamp: new Date().toISOString() });

@@ -21,13 +21,10 @@ export async function GET() {
 
     const institutionId = user.institutionId;
 
-    const [institution, institutionAnalytics, totalStudents, interviewTypes, recentSessions] = await Promise.all([
+    const [institution, totalStudents, interviewTypes, recentSessions, totalInterviewsCount] = await Promise.all([
       prisma.institution.findUnique({
         where: { id: institutionId },
         select: { id: true, name: true, type: true, email: true, joinCode: true, createdAt: true },
-      }),
-      prisma.institutionAnalytics.findUnique({
-        where: { institutionId },
       }),
       prisma.user.count({
         where: { institutionId, role: "student" },
@@ -51,6 +48,9 @@ export async function GET() {
           interviewType: { select: { name: true } },
         },
       }),
+      prisma.interviewSession.count({
+        where: { user: { institutionId } },
+      }),
     ]);
 
     // Calculate average score from recent sessions
@@ -72,7 +72,7 @@ export async function GET() {
       institution,
       stats: {
         totalStudents,
-        totalInterviews: institutionAnalytics?.totalInterviews ?? 0,
+        totalInterviews: totalInterviewsCount,
         averageScore: Math.round(avgScore),
         customInterviewTypes: interviewTypes,
       },

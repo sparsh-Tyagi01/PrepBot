@@ -272,13 +272,13 @@ export default function SkillGapPage() {
                 rel="noopener noreferrer"
                 className="flex items-start gap-4 p-4 rounded-2xl bg-slate-800/30 hover:bg-slate-800/60 border border-slate-700 hover:border-slate-600 transition-all duration-200 group"
               >
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0">
                   <resource.icon className="text-white" size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-white text-sm truncate">{resource.title}</span>
-                    <ExternalLink size={12} className="text-slate-500 group-hover:text-purple-400 flex-shrink-0 transition-colors" />
+                    <ExternalLink size={12} className="text-slate-500 group-hover:text-indigo-400 shrink-0 transition-colors" />
                   </div>
                   <p className="text-xs text-slate-400">{resource.author}</p>
                   <Badge variant="secondary" className="text-xs mt-2">{resource.type}</Badge>
@@ -290,9 +290,9 @@ export default function SkillGapPage() {
       </Card>
 
       {weaknesses.length > 0 && (
-        <Card className="bg-gradient-to-br from-amber-600/10 via-orange-600/10 to-transparent">
+        <Card className="bg-linear-to-br from-amber-600/10 via-orange-600/10 to-transparent">
           <CardContent className="p-6 flex items-start gap-4">
-            <AlertTriangle className="text-amber-400 flex-shrink-0 mt-0.5" size={20} />
+            <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={20} />
             <div>
               <p className="font-semibold text-white mb-1">Improvement Plan</p>
               <p className="text-slate-300 text-sm">

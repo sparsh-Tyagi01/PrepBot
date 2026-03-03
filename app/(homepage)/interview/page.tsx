@@ -75,7 +75,7 @@ export default function InterviewPage() {
         <Button
           onClick={() => router.push('/interview/start')}
           size="lg"
-          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+          className="bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
         >
           <Play className="mr-2" size={20} />
           Start New Interview

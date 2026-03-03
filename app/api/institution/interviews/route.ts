@@ -69,6 +69,9 @@ export async function POST(request: Request) {
         icon: icon || "📋",
         isGlobal: false,
       },
+      include: {
+        _count: { select: { questionBanks: true, interviewSessions: true } },
+      },
     });
 
     return NextResponse.json({ interviewType }, { status: 201 });

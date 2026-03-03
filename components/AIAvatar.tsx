@@ -92,35 +92,54 @@ export default function AIAvatar({
     return () => clearTimeout(id);
   }, [isSpeaking]);
 
+  // Generation counter — every new startSpeech() gets a unique id.
+  // Callbacks from cancelled/stale utterances check this and bail out early,
+  // preventing them from calling onSpeakingComplete and killing the NEW speech.
+  const speechGenRef  = useRef(0);
+  const keepAliveRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopSpeech = () => {
+    speechGenRef.current++;                        // invalidate any in-flight utterance
+    if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null; }
+    window.speechSynthesis.cancel();
+    stopMouthAnim();
+  };
+
   // TTS
   useEffect(() => {
     if (isSpeaking && text && !isMuted) { setIsActive(true); startSpeech(text); }
-    else if (isSpeaking && isMuted) { setIsActive(false); onSpeakingComplete?.(); }
-    else if (!isSpeaking) { stopSpeech(); setIsActive(false); }
+    else if (isSpeaking && isMuted)     { setIsActive(false); onSpeakingComplete?.(); }
+    else if (!isSpeaking)               { stopSpeech(); setIsActive(false); }
     return () => stopSpeech();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSpeaking, text, isMuted]);
 
-  const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const startSpeech = (txt: string) => {
+    // Grab a unique generation id for this utterance BEFORE cancel(), so that
+    // the onerror/onend of the previous (now-cancelled) utterance sees a stale gen.
+    const myGen = ++speechGenRef.current;
+    if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null; }
     window.speechSynthesis.cancel();
 
-    // Chrome bug: voices may not be loaded yet — wait for them
     const speak = () => {
+      // If stopSpeech() was called between scheduling and now, abort.
+      if (speechGenRef.current !== myGen) return;
+
       const utterance = new SpeechSynthesisUtterance(txt);
-      utterance.rate = 0.95;
-      utterance.pitch = 1.05;
+      utterance.rate   = 0.95;
+      utterance.pitch  = 1.05;
       utterance.volume = 1;
 
-      const voices = window.speechSynthesis.getVoices();
+      const voices    = window.speechSynthesis.getVoices();
       const preferred = voices.find(v => v.lang === 'en-US' && /Google|natural|Daniel|Samantha/i.test(v.name))
-        ?? voices.find(v => v.lang.startsWith('en')) ?? voices[0];
+        ?? voices.find(v => v.lang.startsWith('en'))
+        ?? voices[0];
       if (preferred) utterance.voice = preferred;
 
       utterance.onstart = () => {
+        if (speechGenRef.current !== myGen) { window.speechSynthesis.cancel(); return; }
         startMouthAnim();
-        // Chrome cuts off speech after ~15s — keep it alive with pause/resume
+        // Chrome cuts off speech after ~15 s — keep it alive with pause/resume
         keepAliveRef.current = setInterval(() => {
           if (window.speechSynthesis.speaking) {
             window.speechSynthesis.pause();
@@ -128,31 +147,57 @@ export default function AIAvatar({
           }
         }, 10000);
       };
-      utterance.onend = () => {
+
+      const finish = (isError = false, errEvent?: SpeechSynthesisErrorEvent) => {
         if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null; }
-        stopMouthAnim(); setIsActive(false); onSpeakingComplete?.();
+        // Only propagate completion for the currently active generation.
+        // Cancelled older utterances must NOT call onSpeakingComplete — that
+        // would set isAISpeaking=false in the parent and kill the NEW speech.
+        if (speechGenRef.current !== myGen) return;
+        if (isError && errEvent && errEvent.error !== 'interrupted' && errEvent.error !== 'canceled') {
+          console.error('TTS error:', errEvent.error);
+        }
+        stopMouthAnim();
+        setIsActive(false);
+        onSpeakingComplete?.();
       };
-      utterance.onerror = (e) => {
-        if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null; }
-        if (e.error !== 'interrupted' && e.error !== 'canceled') console.error('TTS:', e);
-        stopMouthAnim(); setIsActive(false); onSpeakingComplete?.();
-      };
+
+      utterance.onend   = ()  => finish();
+      utterance.onerror = (e) => finish(true, e);
+
       speechRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     };
 
-    // If voices not loaded yet, wait for the event
-    if (window.speechSynthesis.getVoices().length > 0) {
-      speak();
-    } else {
-      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; speak(); };
-    }
-  };
+    // Chrome sometimes needs a tick after cancel() before speak() works reliably.
+    // Also handles the case where voices aren't loaded yet (with event + poll fallback).
+    const trySpeak = () => {
+      if (speechGenRef.current !== myGen) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        speak();
+      } else {
+        // Voices not ready — wait via event AND poll (event may already have fired)
+        let did = false;
+        const go = () => {
+          if (did || speechGenRef.current !== myGen) return;
+          did = true;
+          window.speechSynthesis.onvoiceschanged = null;
+          speak();
+        };
+        window.speechSynthesis.onvoiceschanged = go;
+        let attempts = 0;
+        const poll = () => {
+          if (did || speechGenRef.current !== myGen) return;
+          if (window.speechSynthesis.getVoices().length > 0) { go(); return; }
+          if (++attempts < 50) setTimeout(poll, 80);
+        };
+        setTimeout(poll, 80);
+      }
+    };
 
-  const stopSpeech = () => {
-    if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null; }
-    window.speechSynthesis.cancel();
-    stopMouthAnim();
+    // 50 ms delay gives Chrome time to process the pending cancel() before we speak()
+    setTimeout(trySpeak, 50);
   };
 
   /* ── Render ── */

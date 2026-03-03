@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
 
       {/* Readiness Score */}
       <Card className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 via-blue-600/10 to-cyan-600/10" />
+        <div className="absolute inset-0 bg-linear-to-br from-indigo-500/10 via-violet-600/10 to-cyan-500/10" />
         <CardHeader className="relative">
           <CardTitle className="text-2xl">Overall Readiness Score</CardTitle>
           <CardDescription>Your interview preparation level</CardDescription>
@@ -127,14 +127,14 @@ export default function AnalyticsPage() {
                   />
                   <defs>
                     <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#9333ea" />
-                      <stop offset="50%" stopColor="#3b82f6" />
+                      <stop offset="0%" stopColor="#6366f1" />
+                      <stop offset="50%" stopColor="#8b5cf6" />
                       <stop offset="100%" stopColor="#06b6d4" />
                     </linearGradient>
                   </defs>
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <div className="text-6xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                  <div className="text-6xl font-bold bg-linear-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
                     {readiness}%
                   </div>
                   <div className="text-slate-400 mt-2">Readiness Score</div>

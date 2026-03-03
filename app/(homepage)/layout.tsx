@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { 
   Brain, LayoutDashboard, PlayCircle, FileText, BarChart3, 
-  Target, Settings, LogOut, Menu, X, ChevronDown, User, Bell
+  Target, Settings, LogOut, Menu, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -25,8 +25,12 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
   const pathname = usePathname();
+
+  // Live interview room — render fullscreen, no sidebar/navbar
+  // Matches /interview/[id] but NOT /interview or /interview/start
+  const isInterviewRoom = pathname.startsWith('/interview/') && pathname !== '/interview/start';
+  if (isInterviewRoom) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -118,72 +122,14 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <div className="lg:pl-72 flex flex-col flex-1">
-        {/* Top navbar */}
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-xl px-4 sm:gap-x-6 sm:px-6 lg:px-8">
-          <button
-            type="button"
-            className="lg:hidden -m-2.5 p-2.5 text-slate-400 hover:text-white"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Menu size={24} />
-          </button>
-
-          <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6 items-center justify-end">
-            {/* Notifications */}
-            <button className="relative p-2 text-slate-400 hover:text-white transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-purple-500 rounded-full" />
-            </button>
-
-            {/* Profile dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 p-2 rounded-2xl hover:bg-slate-800/50 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center">
-                  <User size={16} className="text-white" />
-                </div>
-                <div className="hidden md:block text-left">
-                  <div className="text-sm font-medium text-white">John Doe</div>
-                  <div className="text-xs text-slate-400">Pro Plan</div>
-                </div>
-                <ChevronDown size={16} className="text-slate-400" />
-              </button>
-
-              {profileOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setProfileOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-slate-800/95 backdrop-blur-xl border border-slate-700 shadow-xl z-50">
-                    <div className="p-2">
-                      <Link
-                        href="/settings"
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-300 rounded-xl hover:bg-slate-700/50 hover:text-white transition-colors"
-                        onClick={() => setProfileOpen(false)}
-                      >
-                        <Settings size={16} />
-                        Settings
-                      </Link>
-                      <button
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 rounded-xl hover:bg-red-500/10 hover:text-red-300 transition-colors w-full"
-                        onClick={() => {
-                          setProfileOpen(false);
-                          signOut({ callbackUrl: "/login" });
-                        }}
-                      >
-                        <LogOut size={16} />
-                        Logout
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Mobile menu button — floating top-left, only on small screens */}
+        <button
+          type="button"
+          className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-400 hover:text-white backdrop-blur-sm"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <Menu size={22} />
+        </button>
 
         {/* Page content */}
         <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">{children}</main>

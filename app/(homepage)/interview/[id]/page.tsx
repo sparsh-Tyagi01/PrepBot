@@ -61,6 +61,10 @@ export default function LiveInterviewPage() {
   const recognitionRef = useRef<any>(null);
   const isRecordingRef  = useRef(false);
 
+  // Audio unlock gate — browser blocks TTS unless called from a direct user gesture
+  const [readyToStart, setReadyToStart] = useState(false);
+  const pendingInitDataRef = useRef<InterviewSession | null>(null);
+
   // UI panels
   const [showTranscript, setShowTranscript] = useState(false);
   const [showCodeEditor, setShowCodeEditor] = useState(false);
@@ -133,12 +137,38 @@ export default function LiveInterviewPage() {
       setConversationLog(data.conversationLog || []);
       if (data.status === 'pending') {
         await startSession();
-        if (!data.conversationLog?.length) await initializeInterview(data);
+        // Store session for init — need user click first to unlock TTS
+        if (!data.conversationLog?.length) pendingInitDataRef.current = data;
       } else if (data.status === 'in-progress' && !data.conversationLog?.length) {
-        await initializeInterview(data);
+        pendingInitDataRef.current = data;
+      } else {
+        // Already has conversation — no init needed, mark ready immediately
+        setReadyToStart(true);
       }
     } catch { router.push('/interview'); }
     finally  { setLoading(false); }
+  };
+
+  // Runs once the user clicks "Begin" — speech synthesis is now unlocked
+  useEffect(() => {
+    if (!readyToStart || !pendingInitDataRef.current) return;
+    const data = pendingInitDataRef.current;
+    pendingInitDataRef.current = null;
+    initializeInterview(data);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readyToStart]);
+
+  const handleBeginInterview = () => {
+    // Speak a zero-volume inaudible utterance to unlock audio AND pre-load voices.
+    // Do NOT call cancel() — that consumes the onvoiceschanged event, which breaks AIAvatar's
+    // voice-selection fallback (it registers onvoiceschanged but it never fires again).
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      const unlock = new SpeechSynthesisUtterance('\u00A0'); // non-breaking space
+      unlock.volume = 0;
+      unlock.rate = 10; // ultra-fast, inaudible
+      window.speechSynthesis.speak(unlock);
+    }
+    setReadyToStart(true);
   };
 
   const startSession = async () => {
@@ -330,6 +360,27 @@ export default function LiveInterviewPage() {
         <p className="text-slate-400">Session not found</p>
         <Button onClick={() => router.push('/interview')} className="bg-purple-600 hover:bg-purple-700">Back</Button>
       </div>
+    </div>
+  );
+
+  // Audio-unlock gate — show before TTS is attempted
+  if (!readyToStart && pendingInitDataRef.current) return (
+    <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center gap-8 p-6">
+      <div className="text-center space-y-2">
+        <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
+          <Video size={30} className="text-white" />
+        </div>
+        <h2 className="text-2xl font-bold text-white">{session.title}</h2>
+        <p className="text-slate-400">Your interviewer is ready — click below to start the call with voice enabled.</p>
+        <p className="text-xs text-slate-500 mt-1">{session.interviewType.name} · {session.difficulty} · {session.duration} min</p>
+      </div>
+      <button
+        onClick={handleBeginInterview}
+        className="px-10 py-4 rounded-2xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105 active:scale-95"
+      >
+        🎙 Begin Interview
+      </button>
+      <p className="text-xs text-slate-600">Make sure your speakers/headphones are on.</p>
     </div>
   );
 
