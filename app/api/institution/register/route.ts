@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 /** Generates a short readable join code like "X7K4RM" */
 function generateJoinCode(): string {
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     }
 
     // Create everything atomically
-    const { institution, user } = await prisma.$transaction(async (tx) => {
+    const { institution, user } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const institution = await tx.institution.create({
         data: {
           name: institutionName,
