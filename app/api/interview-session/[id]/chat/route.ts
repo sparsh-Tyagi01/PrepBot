@@ -176,7 +176,7 @@ export async function POST(
           },
         },
       });
-      institutionQuestions = banks.flatMap((b) => b.questions);
+      institutionQuestions = banks.flatMap((b: typeof banks[number]) => b.questions);
     }
 
     const aiText = (
