@@ -79,7 +79,7 @@ export default function InstitutionInterviewsPage() {
     }
 
     setTypes((prev) => [data.interviewType, ...prev]);
-    setForm({ name: "", description: "", icon: "📋", duration: "", difficulty: "" });
+    setForm({ name: "", description: "", icon: "📋", duration: "", difficulty: "", branchId: "", sectionId: "" });
     setShowForm(false);
     setCreating(false);
   };
