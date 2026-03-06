@@ -30,9 +30,49 @@ model Institution {
 
   subscription      Subscription?
   users             User[]
+  branches          Branch[]
   questionBanks     QuestionBank[]
   analytics         InstitutionAnalytics?
   interviewTypes    InterviewType[]
+}
+
+// ================================
+// BRANCH & SECTION MANAGEMENT
+// ================================
+
+model Branch {
+  id            String   @id @default(cuid())
+  institutionId String
+  name          String
+  code          String   @unique // unique join code for students, e.g. "CSE001"
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  institution    Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  sections       BranchSection[]
+  users          User[]
+  questionBanks  QuestionBank[]
+  interviewTypes InterviewType[]
+
+  @@index([institutionId])
+}
+
+model BranchSection {
+  id          String   @id @default(cuid())
+  branchId    String
+  name        String
+  code        String   @unique // unique join code for students, e.g. "CSE-A01"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branch         Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  users          User[]
+  questionBanks  QuestionBank[]
+  interviewTypes InterviewType[]
+
+  @@index([branchId])
 }
 
 model Subscription {
@@ -70,11 +110,15 @@ model User {
   studentId       String?   // Institution-specific student ID
   department      String?
   yearOfStudy     Int?
+  branchId        String?   // FK → Branch
+  sectionId       String?   // FK → BranchSection
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   institution       Institution?        @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  branch            Branch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  section           BranchSection?      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   accounts          Account[]
   sessions          Session[]
   interviewSessions InterviewSession[]
@@ -84,6 +128,8 @@ model User {
   practiceHistory   PracticeHistory[]
 
   @@index([institutionId])
+  @@index([branchId])
+  @@index([sectionId])
   @@index([email])
 }
 
@@ -129,24 +175,34 @@ model VerificationToken {
 model InterviewType {
   id              String   @id @default(cuid())
   institutionId   String?
+  branchId        String?  // if set: only visible to students in this branch
+  sectionId       String?  // if set: only visible to students in this section
   name            String   // Technical, Behavioral, System Design, HR, etc.
   description     String?  @db.Text
   icon            String?
   isGlobal        Boolean  @default(false) // Global types available to all institutions
+  duration        Int?     // Fixed duration in minutes; set by institution (null = student chooses)
+  difficulty      String?  // Fixed difficulty; set by institution (null = student chooses)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   institution       Institution?       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  branch            Branch?            @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  section           BranchSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   questionBanks     QuestionBank[]
   interviewSessions InterviewSession[]
 
   @@index([institutionId])
+  @@index([branchId])
+  @@index([sectionId])
 }
 
 model QuestionBank {
   id              String   @id @default(cuid())
   institutionId   String
   interviewTypeId String
+  branchId        String?  // if set: only for this branch
+  sectionId       String?  // if set: only for this section
   name            String
   description     String?  @db.Text
   difficulty      String   @default("medium") // easy, medium, hard
@@ -154,12 +210,16 @@ model QuestionBank {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  interviewType InterviewType @relation(fields: [interviewTypeId], references: [id], onDelete: Cascade)
+  institution   Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  interviewType InterviewType  @relation(fields: [interviewTypeId], references: [id], onDelete: Cascade)
+  branch        Branch?        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  section       BranchSection? @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   questions     Question[]
 
   @@index([institutionId])
   @@index([interviewTypeId])
+  @@index([branchId])
+  @@index([sectionId])
 }
 
 model Question {

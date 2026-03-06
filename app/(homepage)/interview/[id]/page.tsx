@@ -61,6 +61,13 @@ export default function LiveInterviewPage() {
   const recognitionRef = useRef<any>(null);
   const isRecordingRef  = useRef(false);
 
+  // Interview ending & silence detection
+  const [isEnding,       setIsEnding]       = useState(false);
+  const isEndingRef      = useRef(false);
+  const hasRedirectedRef = useRef(false);
+  const silenceTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeRemainingRef = useRef(0);
+
   // Audio unlock gate — browser blocks TTS unless called from a direct user gesture
   const [readyToStart, setReadyToStart] = useState(false);
   const pendingInitDataRef = useRef<InterviewSession | null>(null);
@@ -96,7 +103,9 @@ export default function LiveInterviewPage() {
     const t = setInterval(() => {
       setTimeRemaining(p => {
         const next = p - 1;
-        if (next <= 0) { clearInterval(t); handleEndInterview(); return 0; }
+        timeRemainingRef.current = next;
+        if (next <= 0) { clearInterval(t); if (!isEndingRef.current) handleEndInterview(); return 0; }
+        if (isEndingRef.current) return next;
         // Show progressive warnings
         if (next === 120) setTimeWarning('⏰ 2 minutes remaining — wrap up your answer.');
         else if (next === 60) setTimeWarning('⚠️ 1 minute left! Interview ending soon.');
@@ -114,6 +123,36 @@ export default function LiveInterviewPage() {
     const t = setTimeout(() => setTimeWarning(null), 5000);
     return () => clearTimeout(t);
   }, [timeWarning]);
+
+  /* ─── Silence detection ───
+     After AI finishes a response, if the user stays silent for 45 s,
+     the AI prompts them to continue or rephrase the question. */
+  useEffect(() => {
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+    // Only start silence timer when AI has finished, we're not waiting/recording/ending
+    if (isAISpeaking || isWaitingForAI || isRecording || isEndingRef.current || conversationLog.length === 0) return;
+
+    silenceTimerRef.current = setTimeout(async () => {
+      if (isRecordingRef.current || isEndingRef.current) return;
+      setIsWaitingForAI(true);
+      try {
+        const res = await fetch(`/api/interview-session/${sessionId}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: '[SYSTEM_SILENCE]', type: 'text', timeRemainingSeconds: timeRemainingRef.current }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setConversationLog(data.conversationLog);
+          const last = data.conversationLog.at(-1);
+          if (last?.speaker === 'ai') { setCurrentAIMessage(last.message); setIsAISpeaking(true); }
+        }
+      } finally { setIsWaitingForAI(false); }
+    }, 45000);
+
+    return () => { if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAISpeaking, isWaitingForAI, isRecording]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,6 +173,7 @@ export default function LiveInterviewPage() {
       const data: InterviewSession = await res.json();
       setSession(data);
       setTimeRemaining(data.duration * 60);
+      timeRemainingRef.current = data.duration * 60;
       setConversationLog(data.conversationLog || []);
       if (data.status === 'pending') {
         await startSession();
@@ -204,7 +244,7 @@ export default function LiveInterviewPage() {
       const res = await fetch(`/api/interview-session/${sessionId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: '[SYSTEM_INIT] Please ask your first interview question now.', type: 'text', timeRemainingSeconds: timeRemaining }),
+        body: JSON.stringify({ message: '[SYSTEM_INIT] Please ask your first interview question now.', type: 'text', timeRemainingSeconds: timeRemainingRef.current }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -221,7 +261,41 @@ export default function LiveInterviewPage() {
   };
 
   const handleEndInterview = async () => {
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
+    setIsEnding(true);
     recognitionRef.current?.stop?.();
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+
+    // Ask AI to close the interview naturally
+    try {
+      setIsWaitingForAI(true);
+      const res = await fetch(`/api/interview-session/${sessionId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: '[SYSTEM_END]', type: 'text', timeRemainingSeconds: timeRemainingRef.current }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setConversationLog(data.conversationLog);
+        const last = data.conversationLog.at(-1);
+        if (last?.speaker === 'ai') {
+          setCurrentAIMessage(last.message);
+          setIsAISpeaking(true);
+          // onSpeakingComplete will call doRedirect; fallback after 8 s if TTS doesn't fire
+          setTimeout(doRedirect, 8000);
+          return;
+        }
+      }
+    } catch {}
+    finally { setIsWaitingForAI(false); }
+
+    doRedirect();
+  };
+
+  const doRedirect = async () => {
+    if (hasRedirectedRef.current) return;
+    hasRedirectedRef.current = true;
     await fetch(`/api/interview-session/${sessionId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -239,6 +313,8 @@ export default function LiveInterviewPage() {
       setIsRecording(false);
       isRecordingRef.current = false;
     }
+    // Clear silence timer — user is actively responding
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
     setFinalTranscript('');
     setInterimTranscript('');
     setIsWaitingForAI(true);
@@ -246,7 +322,7 @@ export default function LiveInterviewPage() {
       const res = await fetch(`/api/interview-session/${sessionId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, type, timeRemainingSeconds: timeRemaining }),
+        body: JSON.stringify({ message: msg, type, timeRemainingSeconds: timeRemainingRef.current }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -450,7 +526,7 @@ export default function LiveInterviewPage() {
             avatar={session.aiInterviewer.avatar}
             isSpeaking={isAISpeaking}
             text={currentAIMessage}
-            onSpeakingComplete={() => setIsAISpeaking(false)}
+            onSpeakingComplete={() => { setIsAISpeaking(false); if (isEndingRef.current) doRedirect(); }}
           />
 
         </div>
@@ -549,7 +625,10 @@ export default function LiveInterviewPage() {
           {/* End call */}
           <button
             onClick={handleEndInterview}
-            className="w-14 h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-all border-2 border-red-500 shadow-lg"
+            disabled={isEnding}
+            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all border-2 shadow-lg ${
+              isEnding ? 'bg-slate-700 border-slate-600 opacity-50 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 border-red-500'
+            }`}
           >
             <PhoneOff size={22} className="text-white" />
           </button>
@@ -633,6 +712,17 @@ export default function LiveInterviewPage() {
           <div ref={logEndRef} />
         </div>
       </div>
+
+      {/* ── Wrap-up overlay — shown while AI says goodbye ── */}
+      {isEnding && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="text-center space-y-3">
+            <Loader2 size={36} className="animate-spin text-purple-400 mx-auto" />
+            <p className="text-white font-semibold text-lg">Wrapping up your interview...</p>
+            <p className="text-slate-400 text-sm">Your interviewer is closing the session. Please wait.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

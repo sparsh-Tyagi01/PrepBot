@@ -7,7 +7,7 @@ import { useSession } from "next-auth/react";
 import { signOut } from "next-auth/react";
 import {
   Building2, LayoutDashboard, PlayCircle, BookOpen,
-  BarChart3, Settings, LogOut, Users,
+  BarChart3, Settings, LogOut, Users, GitBranch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +15,7 @@ const institutionNav = [
   { name: "Dashboard", href: "/institution/dashboard", icon: LayoutDashboard },
   { name: "Interview Types", href: "/institution/interviews", icon: PlayCircle },
   { name: "Question Banks", href: "/institution/question-banks", icon: BookOpen },
+  { name: "Branches", href: "/institution/branches", icon: GitBranch },
   { name: "Students", href: "/institution/students", icon: Users },
   { name: "Analytics", href: "/institution/analytics", icon: BarChart3 },
   { name: "Settings", href: "/institution/settings", icon: Settings },

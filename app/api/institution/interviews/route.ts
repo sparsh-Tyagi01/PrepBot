@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, description, icon } = body;
+    const { name, description, icon, duration, difficulty, branchId, sectionId } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -63,11 +63,15 @@ export async function POST(request: Request) {
 
     const interviewType = await prisma.interviewType.create({
       data: {
-        institutionId,
+        institution: { connect: { id: institutionId } },
         name,
         description,
         icon: icon || "📋",
         isGlobal: false,
+        duration: duration ? Number(duration) : null,
+        difficulty: difficulty || null,
+        branchId: branchId || null,
+        sectionId: sectionId || null,
       },
       include: {
         _count: { select: { questionBanks: true, interviewSessions: true } },

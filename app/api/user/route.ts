@@ -24,7 +24,11 @@ export async function GET(request: Request) {
         image: true,
         createdAt: true,
         institutionId: true,
+        branchId: true,
+        sectionId: true,
         institution: { select: { id: true, name: true, joinCode: true } },
+        branch: { select: { id: true, name: true, code: true } },
+        section: { select: { id: true, name: true, code: true } },
       },
     });
 

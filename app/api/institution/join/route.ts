@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     // Update user to link to institution
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { institutionId: institution.id },
+      data: { institutionId: institution.id, branchId: null, sectionId: null },
     });
 
     return NextResponse.json({ institution });
@@ -76,7 +76,7 @@ export async function DELETE() {
 
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { institutionId: null },
+      data: { institutionId: null, branchId: null, sectionId: null },
     });
 
     return NextResponse.json({ success: true });

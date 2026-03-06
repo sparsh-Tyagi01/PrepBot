@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Save } from 'lucide-react';
+import { Play, Save, ChevronDown, ChevronUp, Terminal } from 'lucide-react';
 
 interface CodeEditorProps {
   language?: string;
@@ -15,6 +15,8 @@ interface CodeEditorProps {
   height?: string;
   readOnly?: boolean;
 }
+
+const SUPPORTED_LANGUAGES = new Set(['javascript','typescript','python','java','cpp','go','rust']);
 
 const CODE_TEMPLATES: Record<string, string> = {
   javascript: `// Write your JavaScript code here
@@ -65,6 +67,9 @@ export default function CodeEditor({
 }: CodeEditorProps) {
   const [code, setCode] = useState(defaultValue || CODE_TEMPLATES[language] || '');
   const [isExecuting, setIsExecuting] = useState(false);
+  const [output, setOutput] = useState<string | null>(null);
+  const [outputError, setOutputError] = useState(false);
+  const [showOutput, setShowOutput] = useState(false);
   const editorRef = useRef<any>(null);
 
   // Emit initial value so parent knows the editor content on mount
@@ -93,11 +98,46 @@ export default function CodeEditor({
   };
 
   const handleRun = async () => {
-    if (!code.trim() || !onRun) return;
-    
+    if (!code.trim()) return;
     setIsExecuting(true);
+    setOutput(null);
+    setOutputError(false);
+    setShowOutput(true);
+
+    // Notify parent (e.g. to update codeAnswer)
+    onRun?.(code);
+
+    if (!SUPPORTED_LANGUAGES.has(language)) {
+      setOutput(`Execution not supported for ${language}`);
+      setOutputError(true);
+      setIsExecuting(false);
+      return;
+    }
+
     try {
-      await onRun(code);
+      const res = await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language, code }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setOutput(data.error ?? `Execution server error (${res.status}).`);
+        setOutputError(true);
+        return;
+      }
+
+      const stdout  = data.stdout  ?? '';
+      const stderr  = data.stderr  ?? '';
+      const compile = data.compile_output ?? '';
+      const combined = [compile, stderr, stdout].filter(Boolean).join('\n').trim();
+      setOutput(combined || '(no output)');
+      setOutputError(!stdout && !!(stderr || compile));
+    } catch {
+      setOutput('Could not reach execution server. Check your internet connection.');
+      setOutputError(true);
     } finally {
       setIsExecuting(false);
     }
@@ -108,8 +148,13 @@ export default function CodeEditor({
     onSave(code);
   };
 
+  const OUTPUT_PANEL_H = 190; // header (30px) + content (max-h-40 = 160px)
+  const editorHeight = showOutput
+    ? `calc(${height} - ${OUTPUT_PANEL_H}px)`
+    : height;
+
   return (
-    <div className="border border-slate-700 rounded-lg overflow-hidden bg-slate-900">
+    <div className="border border-slate-700 rounded-lg overflow-hidden bg-slate-900 flex flex-col">
       {/* Editor Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700">
         <div className="flex items-center gap-2">
@@ -133,24 +178,22 @@ export default function CodeEditor({
                 Save
               </Button>
             )}
-            {onRun && (
-              <Button
-                onClick={handleRun}
-                size="sm"
-                disabled={isExecuting}
-                className="h-7 text-xs bg-green-600 hover:bg-green-700"
-              >
-                <Play size={14} className="mr-1" />
-                {isExecuting ? 'Running...' : 'Run Code'}
-              </Button>
-            )}
+            <Button
+              onClick={handleRun}
+              size="sm"
+              disabled={isExecuting}
+              className="h-7 text-xs bg-green-600 hover:bg-green-700"
+            >
+              <Play size={14} className="mr-1" />
+              {isExecuting ? 'Running...' : 'Run Code'}
+            </Button>
           </div>
         )}
       </div>
 
       {/* Monaco Editor */}
       <Editor
-        height={height}
+        height={editorHeight}
         language={language}
         value={code}
         onChange={handleEditorChange}
@@ -175,6 +218,27 @@ export default function CodeEditor({
           snippetSuggestions: 'inline',
         }}
       />
+
+      {/* Output Panel */}
+      {showOutput && (
+        <div className="border-t border-slate-700">
+          <button
+            onClick={() => setShowOutput(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-1.5 bg-slate-800 hover:bg-slate-750 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <Terminal size={12} />
+              Output
+            </span>
+            {showOutput ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+          </button>
+          <div className={`px-4 py-3 font-mono text-xs whitespace-pre-wrap max-h-40 overflow-y-auto ${outputError ? 'text-red-400' : 'text-green-300'}`}>
+            {isExecuting
+              ? <span className="text-slate-400 animate-pulse">Executing...</span>
+              : output}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

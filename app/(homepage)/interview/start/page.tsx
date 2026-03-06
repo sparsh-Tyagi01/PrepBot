@@ -44,6 +44,9 @@ interface InterviewType {
   name: string;
   description: string;
   icon: string;
+  isGlobal: boolean;
+  duration: number | null;
+  difficulty: string | null;
 }
 
 export default function StartInterviewPage() {
@@ -86,6 +89,10 @@ export default function StartInterviewPage() {
       ?? null;
     setSelectedType(type);
     setAssignedInterviewer(matched);
+    // If the type has a fixed duration, lock in that value
+    if (type.duration) setDuration(type.duration);
+    // If the type has a fixed difficulty, lock in that value
+    if (type.difficulty) setDifficulty(type.difficulty as 'easy' | 'medium' | 'hard');
     setStep('details');
     // Slight delay so AIAvatar mounts before speaking starts
     setTimeout(() => setIsSpeaking(true), 600);
@@ -262,25 +269,36 @@ export default function StartInterviewPage() {
                     <Zap size={16} className="text-amber-400" />
                     <p className="font-semibold text-white text-sm">Difficulty</p>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(['easy', 'medium', 'hard'] as const).map(level => (
-                      <button
-                        key={level}
-                        onClick={() => setDifficulty(level)}
-                        className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
-                          difficulty === level
-                            ? level === 'easy'
-                              ? 'bg-green-600/20 border-green-500 text-green-300'
-                              : level === 'medium'
-                              ? 'bg-amber-600/20 border-amber-500 text-amber-300'
-                              : 'bg-red-600/20 border-red-500 text-red-300'
-                            : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'
-                        }`}
-                      >
-                        {level.charAt(0).toUpperCase() + level.slice(1)}
-                      </button>
-                    ))}
-                  </div>
+                  {selectedType.difficulty ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <span className={`text-sm font-medium ${
+                        selectedType.difficulty === 'easy' ? 'text-green-400' :
+                        selectedType.difficulty === 'hard' ? 'text-red-400' : 'text-amber-400'
+                      }`}>
+                        ⚡ Fixed by your institution: {selectedType.difficulty.charAt(0).toUpperCase() + selectedType.difficulty.slice(1)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-3">
+                      {(['easy', 'medium', 'hard'] as const).map(level => (
+                        <button
+                          key={level}
+                          onClick={() => setDifficulty(level)}
+                          className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                            difficulty === level
+                              ? level === 'easy'
+                                ? 'bg-green-600/20 border-green-500 text-green-300'
+                                : level === 'medium'
+                                ? 'bg-amber-600/20 border-amber-500 text-amber-300'
+                                : 'bg-red-600/20 border-red-500 text-red-300'
+                              : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'
+                          }`}
+                        >
+                          {level.charAt(0).toUpperCase() + level.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Duration */}
@@ -292,21 +310,27 @@ export default function StartInterviewPage() {
                     </div>
                     <span className="text-purple-300 font-bold">{duration} min</span>
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[15, 30, 45, 60].map(mins => (
-                      <button
-                        key={mins}
-                        onClick={() => setDuration(mins)}
-                        className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
-                          duration === mins
-                            ? 'bg-blue-600/20 border-blue-500 text-blue-300'
-                            : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'
-                        }`}
-                      >
-                        {mins}m
-                      </button>
-                    ))}
-                  </div>
+                  {selectedType.duration ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <span className="text-sm text-amber-400 font-medium">⏱ Fixed by your institution: {selectedType.duration} min</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2">
+                      {[15, 30, 45, 60].map(mins => (
+                        <button
+                          key={mins}
+                          onClick={() => setDuration(mins)}
+                          className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                            duration === mins
+                              ? 'bg-blue-600/20 border-blue-500 text-blue-300'
+                              : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'
+                          }`}
+                        >
+                          {mins}m
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Start */}

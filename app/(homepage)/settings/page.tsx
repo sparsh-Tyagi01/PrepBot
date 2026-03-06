@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   User, Lock, Crown, Check, Bell, Save, AlertCircle, Building2, CheckCircle, LogOut as LeaveIcon,
+  GitBranch, Layers,
 } from "lucide-react";
 
 interface UserProfile {
@@ -16,6 +17,8 @@ interface UserProfile {
   email: string;
   role: string;
   institution?: { id: string; name: string; joinCode: string } | null;
+  branch?: { id: string; name: string; code: string } | null;
+  section?: { id: string; name: string; code: string } | null;
 }
 
 export default function SettingsPage() {
@@ -44,6 +47,24 @@ export default function SettingsPage() {
   const [instLoading, setInstLoading] = useState(false);
   const [instMsg, setInstMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const instTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Branch join state
+  const [branchCode, setBranchCode] = useState("");
+  const [branchPreview, setBranchPreview] = useState<{ name: string } | null>(null);
+  const [branchCodeError, setBranchCodeError] = useState("");
+  const [branchCodeChecking, setBranchCodeChecking] = useState(false);
+  const [branchLoading, setBranchLoading] = useState(false);
+  const [branchMsg, setBranchMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const branchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Section join state
+  const [sectionCode, setSectionCode] = useState("");
+  const [sectionPreview, setSectionPreview] = useState<{ name: string } | null>(null);
+  const [sectionCodeError, setSectionCodeError] = useState("");
+  const [sectionCodeChecking, setSectionCodeChecking] = useState(false);
+  const [sectionLoading, setSectionLoading] = useState(false);
+  const [sectionMsg, setSectionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const sectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleInstCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase().slice(0, 6);
@@ -83,7 +104,7 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to join institution");
-      setProfile((p) => p ? { ...p, institution: data.institution } : p);
+      setProfile((p) => p ? { ...p, institution: data.institution, branch: null, section: null } : p);
       setInstCode("");
       setInstPreview(null);
       setInstMsg({ type: "success", text: `Successfully joined ${data.institution.name}!` });
@@ -91,6 +112,100 @@ export default function SettingsPage() {
       setInstMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to join." });
     } finally {
       setInstLoading(false);
+    }
+  };
+
+  const handleBranchCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase().slice(0, 8);
+    setBranchCode(val);
+    setBranchPreview(null);
+    setBranchCodeError("");
+    if (branchTimerRef.current) clearTimeout(branchTimerRef.current);
+    if (val.length >= 4) {
+      setBranchCodeChecking(true);
+      branchTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/institution/branch/join?code=${val}`);
+          const data = await res.json();
+          if (res.ok && data.branch) setBranchPreview(data.branch);
+          else setBranchCodeError(data.error ?? "Invalid branch code.");
+        } catch {
+          setBranchCodeError("Could not verify code.");
+        } finally {
+          setBranchCodeChecking(false);
+        }
+      }, 500);
+    }
+  };
+
+  const handleJoinBranch = async () => {
+    if (!branchPreview) return;
+    setBranchLoading(true);
+    setBranchMsg(null);
+    try {
+      const res = await fetch("/api/institution/branch/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: branchCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to join branch");
+      setProfile((p) => p ? { ...p, branch: data.branch, section: null } : p);
+      setBranchCode("");
+      setBranchPreview(null);
+      setSectionCode("");
+      setSectionPreview(null);
+      setBranchMsg({ type: "success", text: `Joined branch: ${data.branch.name}!` });
+    } catch (err: unknown) {
+      setBranchMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to join branch." });
+    } finally {
+      setBranchLoading(false);
+    }
+  };
+
+  const handleSectionCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase().slice(0, 8);
+    setSectionCode(val);
+    setSectionPreview(null);
+    setSectionCodeError("");
+    if (sectionTimerRef.current) clearTimeout(sectionTimerRef.current);
+    if (val.length >= 4) {
+      setSectionCodeChecking(true);
+      sectionTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/institution/section/join?code=${val}`);
+          const data = await res.json();
+          if (res.ok && data.section) setSectionPreview(data.section);
+          else setSectionCodeError(data.error ?? "Invalid section code.");
+        } catch {
+          setSectionCodeError("Could not verify code.");
+        } finally {
+          setSectionCodeChecking(false);
+        }
+      }, 500);
+    }
+  };
+
+  const handleJoinSection = async () => {
+    if (!sectionPreview) return;
+    setSectionLoading(true);
+    setSectionMsg(null);
+    try {
+      const res = await fetch("/api/institution/section/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: sectionCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to join section");
+      setProfile((p) => p ? { ...p, section: data.section } : p);
+      setSectionCode("");
+      setSectionPreview(null);
+      setSectionMsg({ type: "success", text: `Joined section: ${data.section.name}!` });
+    } catch (err: unknown) {
+      setSectionMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to join section." });
+    } finally {
+      setSectionLoading(false);
     }
   };
 
@@ -395,23 +510,119 @@ export default function SettingsPage() {
             <Building2 className="text-blue-400" size={24} />
             Institution
           </CardTitle>
-          <CardDescription>Join or leave your institution</CardDescription>
+          <CardDescription>Join your institution, branch, and section using the codes provided by your admin</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {profileLoading ? (
             <Skeleton className="h-20 w-full rounded-xl" />
           ) : profile?.institution ? (
             <div className="space-y-4">
+              {/* Institution status */}
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                  <Building2 size={24} className="text-blue-400" />
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
+                  <Building2 size={20} className="text-blue-400" />
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-white">{profile.institution.name}</p>
-                  <p className="text-xs text-slate-400">You are a member of this institution</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white text-sm">{profile.institution.name}</p>
+                  <p className="text-xs text-slate-400">Institution member</p>
                 </div>
-                <CheckCircle size={20} className="text-emerald-400" />
+                <CheckCircle size={18} className="text-emerald-400 shrink-0" />
               </div>
+
+              {/* Branch status + join box */}
+              {profile.branch ? (
+                <div className="flex items-center gap-4 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-500/20 flex items-center justify-center shrink-0">
+                    <GitBranch size={17} className="text-cyan-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white text-sm">{profile.branch.name}</p>
+                    <p className="text-xs text-slate-400 font-mono">{profile.branch.code}</p>
+                  </div>
+                  <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                </div>
+              ) : (
+                <div className="space-y-2 border border-dashed border-slate-700 rounded-xl p-4">
+                  <p className="text-sm font-medium text-slate-300 flex items-center gap-2"><GitBranch size={15} className="text-cyan-400" /> Join a Branch</p>
+                  <p className="text-xs text-slate-500">Enter your branch join code provided by your institution admin.</p>
+                  <div className="relative">
+                    <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
+                    <input
+                      type="text"
+                      placeholder="Branch code (e.g. CSE4XR)"
+                      value={branchCode}
+                      onChange={handleBranchCodeChange}
+                      maxLength={8}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-800/60 border border-slate-700 rounded-xl text-white placeholder-slate-500 uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-sm"
+                    />
+                  </div>
+                  {branchCodeChecking && <p className="text-xs text-slate-400">Verifying…</p>}
+                  {branchPreview && <p className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle size={11} /> {branchPreview.name}</p>}
+                  {branchCodeError && <p className="text-xs text-red-400">{branchCodeError}</p>}
+                  {branchMsg && (
+                    <p className={`text-xs flex items-center gap-1 ${branchMsg.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                      {branchMsg.type === "success" ? <Check size={12} /> : <AlertCircle size={12} />} {branchMsg.text}
+                    </p>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={handleJoinBranch}
+                    disabled={branchLoading || !branchPreview}
+                    className="bg-cyan-600 hover:bg-cyan-700 h-8 text-xs"
+                  >
+                    {branchLoading ? "Joining…" : "Join Branch"}
+                  </Button>
+                </div>
+              )}
+
+              {/* Section status + join box (only if already in branch) */}
+              {profile.branch && (
+                profile.section ? (
+                  <div className="flex items-center gap-4 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                    <div className="w-9 h-9 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
+                      <Layers size={17} className="text-purple-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-white text-sm">{profile.section.name}</p>
+                      <p className="text-xs text-slate-400 font-mono">{profile.section.code}</p>
+                    </div>
+                    <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                  </div>
+                ) : (
+                  <div className="space-y-2 border border-dashed border-slate-700 rounded-xl p-4">
+                    <div className="text-sm font-medium text-slate-300 flex items-center gap-2"><Layers size={15} className="text-purple-400" /> Join a Section <Badge variant="outline" className="text-xs border-slate-600 text-slate-400">Optional</Badge></div>
+                    <p className="text-xs text-slate-500">Enter your section join code to be placed in a specific class section.</p>
+                    <div className="relative">
+                      <Layers className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
+                      <input
+                        type="text"
+                        placeholder="Section code (e.g. CSEAA4)"
+                        value={sectionCode}
+                        onChange={handleSectionCodeChange}
+                        maxLength={8}
+                        className="w-full pl-9 pr-4 py-2 bg-slate-800/60 border border-slate-700 rounded-xl text-white placeholder-slate-500 uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm"
+                      />
+                    </div>
+                    {sectionCodeChecking && <p className="text-xs text-slate-400">Verifying…</p>}
+                    {sectionPreview && <p className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle size={11} /> {sectionPreview.name}</p>}
+                    {sectionCodeError && <p className="text-xs text-red-400">{sectionCodeError}</p>}
+                    {sectionMsg && (
+                      <p className={`text-xs flex items-center gap-1 ${sectionMsg.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                        {sectionMsg.type === "success" ? <Check size={12} /> : <AlertCircle size={12} />} {sectionMsg.text}
+                      </p>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={handleJoinSection}
+                      disabled={sectionLoading || !sectionPreview}
+                      className="bg-purple-600 hover:bg-purple-700 h-8 text-xs"
+                    >
+                      {sectionLoading ? "Joining…" : "Join Section"}
+                    </Button>
+                  </div>
+                )
+              )}
+
               {instMsg && (
                 <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${
                   instMsg.type === "success"

@@ -43,66 +43,90 @@ function buildSystemPrompt(s: {
   duration: number;
 }, timeRemainingSeconds?: number, institutionQuestions?: { question: string; expectedAnswer?: string | null; keyPoints?: unknown }[]): string {
   const t = s.interviewType.name;
-  const specific: Record<string, string> = {
-    'Technical Interview':
-      'Ask real coding/algorithmic problems. Present one problem, let the candidate explain their approach, then ask them to write code. When they submit code evaluate correctness, time/space complexity and edge cases. Ask follow-up optimisation questions.',
-    'Behavioral Interview':
-      'Use the STAR framework. Ask "Tell me about a time when..." or "Describe a situation where...". Probe for specifics: what was YOUR role, what actions did YOU take, what was the measurable result.',
-    'System Design':
-      'Present an open-ended architecture challenge such as Design a URL shortener or Design Twitter. Walk through requirements, high-level design, components, data models, scalability and trade-offs one step at a time.',
-    'HR Interview':
-      'Focus on culture fit, career goals, motivations and values. Ask about salary expectations, notice period, team preferences and long-term vision.',
-    'Case Study':
-      'Present a business problem. Guide through problem structure, data interpretation, hypothesis formation and a final recommendation. Probe analytical thinking and communication.',
+  const d = (s.difficulty ?? 'medium').toLowerCase();
+
+  // Difficulty calibration — drives question complexity and probing depth
+  const difficultyMap: Record<string, string> = {
+    easy: `DIFFICULTY: Easy (entry/junior level).
+- Ask foundational questions: basic syntax, simple algorithms, core concepts.
+- Use simple, direct language. Avoid edge cases and trick questions.
+- If the candidate struggles, offer encouragement and a gentle hint.
+- Acceptable answers don't need to be perfect; look for basic understanding.`,
+    medium: `DIFFICULTY: Medium (mid-level / 1–3 years experience).
+- Expect solid practical knowledge, not just textbook definitions.
+- Ask about trade-offs, why they chose an approach, and common edge cases.
+- If the answer is correct but shallow, probe once for more depth.
+- Expect the candidate to handle moderately complex scenarios independently.`,
+    hard: `DIFFICULTY: Hard (senior / expert level).
+- Ask complex, nuanced questions: advanced algorithms, deep system design, scalability.
+- Challenge every answer — ask about time/space complexity, failure modes, alternatives.
+- If they give a naive solution say "interesting — can you think of a more optimal approach?".
+- Expect mastery. Probe relentlessly on vague answers. Accept nothing superficial.
+- If they nail a topic, go deeper until you find the edge of their knowledge.`,
   };
 
-  // Build a time-pacing instruction based on remaining seconds
+  const specific: Record<string, string> = {
+    'Technical Interview':
+      'Present one concrete coding or algorithmic problem. Let the candidate describe their approach first, then ask them to code it in the editor. When code is submitted: comment on correctness, time/space complexity, and edge cases. Follow up with an optimisation or related question.',
+    'Behavioral Interview':
+      'Use the STAR method (Situation, Task, Action, Result). If the candidate gives a vague story, probe: "What was YOUR specific role?" "What actions did YOU personally take?" "What was the measurable outcome?" Move on only when you have a full STAR story.',
+    'System Design':
+      'Present an open-ended architecture challenge (e.g. Design a ride-sharing app). Guide methodically: clarify requirements first, then high-level design, core components, data models, scalability/bottlenecks, failure handling. Spend 2-3 turns per area.',
+    'HR Interview':
+      'Ask about culture fit, career goals, team preferences, motivations, and values. Probe for authentic answers. Ask about salary expectations and notice period near the end.',
+    'Case Study':
+      'Present a real business scenario. Guide through: problem framing, data interpretation, hypothesis testing, recommendation. Probe analytical reasoning at every step.',
+  };
+
+  // Time-aware pacing
   let timePacing = '';
   if (timeRemainingSeconds !== undefined) {
     const minsLeft = Math.round(timeRemainingSeconds / 60);
     if (minsLeft <= 1) {
-      timePacing = `\n\nTIME CRITICAL: Only about 1 minute remains. Ask ONE final brief closing question (e.g. any questions for us?) then say a professional goodbye. Do NOT start a new topic.`;
+      timePacing = `\n\nTIME CRITICAL: Under 1 minute left. Immediately wrap up any open question with one sentence, then deliver your closing remarks. Do not start any new topic or question.`;
     } else if (minsLeft <= 3) {
-      timePacing = `\n\nTIMING: Only ${minsLeft} minutes remaining. Wrap up the current topic with at most 1 more follow-up, then move to a closing question. Do NOT introduce a new major topic.`;
-    } else if (minsLeft <= 5) {
-      timePacing = `\n\nTIMING: About ${minsLeft} minutes left. Start transitioning toward final questions. Cover the most important remaining areas concisely.`;
+      timePacing = `\n\nTIMING: ${minsLeft} minutes left. Ask at most ONE more question, then transition to closing. Do not open any new major topic.`;
+    } else if (minsLeft <= 6) {
+      timePacing = `\n\nTIMING: About ${minsLeft} minutes remaining. Start winding down — cover the single most important remaining area, then ask a closing question.`;
     } else {
-      timePacing = `\n\nTIMING: ${minsLeft} minutes remaining out of ${s.duration} total. Pace your questions so you cover all key areas before time runs out.`;
+      timePacing = `\n\nTIMING: ${minsLeft} of ${s.duration} minutes remaining. Maintain good pace — cover all key areas before time runs out.`;
     }
   }
 
-  // Institution-specific question bank
+  // Institution question bank
   let questionBankSection = '';
   if (institutionQuestions && institutionQuestions.length > 0) {
-    const qList = institutionQuestions
-      .map((q, i) => {
-        let line = `${i + 1}. ${q.question}`;
-        if (q.expectedAnswer) line += `\n   Expected answer guidance: ${q.expectedAnswer}`;
-        const kp = q.keyPoints as string[] | null;
-        if (Array.isArray(kp) && kp.length > 0) line += `\n   Key points to probe: ${kp.join(', ')}`;
-        return line;
-      })
-      .join('\n\n');
+    const qList = institutionQuestions.map((q, i) => {
+      let line = `${i + 1}. ${q.question}`;
+      if (q.expectedAnswer) line += `\n   Expected answer: ${q.expectedAnswer}`;
+      const kp = q.keyPoints as string[] | null;
+      if (Array.isArray(kp) && kp.length > 0) line += `\n   Key points to probe: ${kp.join(', ')}`;
+      return line;
+    }).join('\n\n');
     questionBankSection =
-      `\n\nINSTITUTION QUESTION BANK — you MUST work through these questions in order. ` +
-      `Cover all of them within the available time. Do not skip any unless time runs out:\n\n${qList}`;
+      `\n\nINSTITUTION QUESTION BANK — work through ALL questions in order. Cover each one fully before moving on. Do not skip unless time runs out:\n\n${qList}`;
   }
 
   return (
-    `You are ${s.aiInterviewer.name}, a professional interviewer at a top-tier tech company.` +
-    ` You are conducting a ${t} interview. Difficulty: ${s.difficulty}. Duration: ${s.duration} minutes.\n\n` +
+    `You are ${s.aiInterviewer.name}, a highly experienced interviewer at a top-tier tech company conducting a REAL face-to-face interview.` +
+    ` Interview type: ${t}. Duration: ${s.duration} minutes.\n\n` +
     `Persona: ${s.aiInterviewer.personality} — ${s.aiInterviewer.description ?? ''}\n\n` +
-    `Type-specific instructions:\n${specific[t] ?? 'Conduct a thorough professional interview.'}\n\n` +
+    `${difficultyMap[d] ?? difficultyMap['medium']}\n\n` +
+    `Interview type instructions:\n${specific[t] ?? 'Conduct a thorough professional interview.'}\n` +
     questionBankSection +
-    `\n\nSTRICT rules — apply on EVERY single turn:\n` +
-    `1. Speak naturally like a real human interviewer. No robotic language.\n` +
-    `2. NEVER use markdown, bullet points, bold text, or numbered lists. Plain prose only.\n` +
-    `3. Ask EXACTLY ONE question per response.\n` +
-    `4. Keep each response to 2-4 sentences maximum.\n` +
-    `5. If the candidate just answered, acknowledge in ONE brief sentence then ask your next question.\n` +
-    `6. Do NOT say Great answer or That is excellent. Be measured and professional.\n` +
-    `7. When the candidate submits code, give one sentence of feedback then ask a follow-up.\n` +
-    `8. When the trigger is [SYSTEM_INIT], skip all welcomes and ask your FIRST real question immediately.` +
+    `\n\nCRITICAL BEHAVIOUR — apply EVERY turn:\n` +
+    `1. Speak exactly like a real human interviewer. Natural, measured, professional. No robotic language.\n` +
+    `2. NEVER use markdown, bullet points, numbered lists, or headers. Plain conversational prose ONLY.\n` +
+    `3. Ask EXACTLY ONE question per response. Do not stack multiple questions.\n` +
+    `4. Keep each response to 2–5 sentences.\n` +
+    `5. WRONG ANSWER: Do NOT move on silently. Say something like "That's not quite right — let me push back a bit" and ask them to reconsider or give a hint. Only move on if they still cannot answer after a follow-up.\n` +
+    `6. PARTIAL ANSWER: Acknowledge what is correct ("You're right about X"), then probe the missing part: "Can you also walk me through Y?"\n` +
+    `7. VAGUE ANSWER: Ask for specifics — "Can you elaborate?", "Give me a concrete example.", "Walk me through the exact steps."\n` +
+    `8. CORRECT ANSWER (hard difficulty): Push further — "Interesting. Now what happens at 10x scale?", "What are the edge cases?"\n` +
+    `9. After acknowledging an answer, ALWAYS end your turn with a question or a prompting statement to keep the dialogue going.\n` +
+    `10. SYSTEM_INIT trigger: Skip greetings. Ask your FIRST real question immediately.\n` +
+    `11. SYSTEM_SILENCE trigger: The candidate has gone quiet. React naturally — "Take your time, no rush" or "Would it help if I rephrased the question?" or "Feel free to think out loud." Do NOT ask a new question.\n` +
+    `12. SYSTEM_END trigger: Close the interview warmly and professionally. Thank the candidate, give brief closing comments (what stood out, next steps), say goodbye. 3–4 sentences. No new question.` +
     timePacing
   );
 }
@@ -128,10 +152,10 @@ export async function POST(
     if (!iv) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const log = (iv.conversationLog as any[]) || [];
-    const isInit = message.startsWith('[SYSTEM_INIT]');
+    const isSystemTrigger = message.startsWith('[SYSTEM_');
 
-    // Add user message to visible log (skip system triggers)
-    if (!isInit) {
+    // Add user message to visible log (skip internal system triggers)
+    if (!isSystemTrigger) {
       const userText = type === 'code'
         ? 'Here is my code solution:\n```\n' + message + '\n```'
         : message;
@@ -149,8 +173,8 @@ export async function POST(
     // Pop the last user entry — send it via sendMessage
     const lastEntry = history.at(-1);
     const popped = lastEntry?.role === 'user' ? history.pop() : null;
-    const toSend = isInit
-      ? '[SYSTEM_INIT] Please ask your first interview question now.'
+    const toSend = isSystemTrigger
+      ? message
       : (popped?.parts[0].text ?? message);
 
     // systemInstruction ensures the AI has full context on EVERY turn
@@ -163,20 +187,36 @@ export async function POST(
       select: { institutionId: true },
     });
     if (userData?.institutionId) {
+      // Filter question banks and questions by the session's difficulty
       const banks = await prisma.questionBank.findMany({
         where: {
           institutionId: userData.institutionId,
           interviewTypeId: iv.interviewTypeId,
           isActive: true,
+          difficulty: iv.difficulty,
         },
         include: {
           questions: {
-            where: { isActive: true },
+            where: { isActive: true, difficulty: iv.difficulty },
             orderBy: { order: 'asc' },
           },
         },
       });
       institutionQuestions = banks.flatMap((b: typeof banks[number]) => b.questions);
+      // Fallback: if no difficulty-matched questions exist, get all active questions
+      if (institutionQuestions.length === 0) {
+        const allBanks = await prisma.questionBank.findMany({
+          where: {
+            institutionId: userData.institutionId,
+            interviewTypeId: iv.interviewTypeId,
+            isActive: true,
+          },
+          include: {
+            questions: { where: { isActive: true }, orderBy: { order: 'asc' } },
+          },
+        });
+        institutionQuestions = allBanks.flatMap((b: typeof allBanks[number]) => b.questions);
+      }
     }
 
     const aiText = (
