@@ -41,7 +41,7 @@ function buildSystemPrompt(s: {
   interviewType: { name: string };
   difficulty: string;
   duration: number;
-}, timeRemainingSeconds?: number, institutionQuestions?: { question: string; expectedAnswer?: string | null; keyPoints?: unknown }[]): string {
+}, timeRemainingSeconds?: number, institutionQuestions?: { question: string; expectedAnswer?: string | null; keyPoints?: unknown }[], resumeText?: string | null): string {
   const t = s.interviewType.name;
   const d = (s.difficulty ?? 'medium').toLowerCase();
 
@@ -83,13 +83,13 @@ function buildSystemPrompt(s: {
   if (timeRemainingSeconds !== undefined) {
     const minsLeft = Math.round(timeRemainingSeconds / 60);
     if (minsLeft <= 1) {
-      timePacing = `\n\nTIME CRITICAL: Under 1 minute left. Immediately wrap up any open question with one sentence, then deliver your closing remarks. Do not start any new topic or question.`;
+      timePacing = `\n\nTIME CRITICAL: Under 1 minute left. Immediately wrap up with a closing remark and goodbye. Do NOT start any new topic or question. Do NOT mention time to the candidate.`;
     } else if (minsLeft <= 3) {
-      timePacing = `\n\nTIMING: ${minsLeft} minutes left. Ask at most ONE more question, then transition to closing. Do not open any new major topic.`;
+      timePacing = `\n\nTIMING: Only a couple of minutes left. Ask at most ONE more short question then move to closing. Do NOT tell the candidate how much time remains.`;
     } else if (minsLeft <= 6) {
-      timePacing = `\n\nTIMING: About ${minsLeft} minutes remaining. Start winding down — cover the single most important remaining area, then ask a closing question.`;
+      timePacing = `\n\nTIMING: Interview is winding down. Cover the single most important remaining area, then close. Do NOT mention time to the candidate.`;
     } else {
-      timePacing = `\n\nTIMING: ${minsLeft} of ${s.duration} minutes remaining. Maintain good pace — cover all key areas before time runs out.`;
+      timePacing = `\n\nTIMING: ${minsLeft} of ${s.duration} minutes remaining. Maintain good pace — cover all key areas before time runs out. Do NOT mention remaining time to the candidate.`;
     }
   }
 
@@ -107,26 +107,42 @@ function buildSystemPrompt(s: {
       `\n\nINSTITUTION QUESTION BANK — work through ALL questions in order. Cover each one fully before moving on. Do not skip unless time runs out:\n\n${qList}`;
   }
 
+  // Resume context
+  let resumeSection = '';
+  if (resumeText && resumeText.trim()) {
+    resumeSection =
+      `\n\nCANDIDATE RESUME — use this to personalise every question. Reference specific projects, skills, experiences, and technologies mentioned. Do NOT ask things that are already clearly answered by the resume; instead probe deeper into them.\n\n${resumeText.trim()}`;
+  }
+
   return (
     `You are ${s.aiInterviewer.name}, a highly experienced interviewer at a top-tier tech company conducting a REAL face-to-face interview.` +
     ` Interview type: ${t}. Duration: ${s.duration} minutes.\n\n` +
     `Persona: ${s.aiInterviewer.personality} — ${s.aiInterviewer.description ?? ''}\n\n` +
     `${difficultyMap[d] ?? difficultyMap['medium']}\n\n` +
     `Interview type instructions:\n${specific[t] ?? 'Conduct a thorough professional interview.'}\n` +
+    resumeSection +
     questionBankSection +
     `\n\nCRITICAL BEHAVIOUR — apply EVERY turn:\n` +
     `1. Speak exactly like a real human interviewer. Natural, measured, professional. No robotic language.\n` +
     `2. NEVER use markdown, bullet points, numbered lists, or headers. Plain conversational prose ONLY.\n` +
     `3. Ask EXACTLY ONE question per response. Do not stack multiple questions.\n` +
     `4. Keep each response to 2–5 sentences.\n` +
-    `5. WRONG ANSWER: Do NOT move on silently. Say something like "That's not quite right — let me push back a bit" and ask them to reconsider or give a hint. Only move on if they still cannot answer after a follow-up.\n` +
-    `6. PARTIAL ANSWER: Acknowledge what is correct ("You're right about X"), then probe the missing part: "Can you also walk me through Y?"\n` +
-    `7. VAGUE ANSWER: Ask for specifics — "Can you elaborate?", "Give me a concrete example.", "Walk me through the exact steps."\n` +
-    `8. CORRECT ANSWER (hard difficulty): Push further — "Interesting. Now what happens at 10x scale?", "What are the edge cases?"\n` +
-    `9. After acknowledging an answer, ALWAYS end your turn with a question or a prompting statement to keep the dialogue going.\n` +
-    `10. SYSTEM_INIT trigger: Skip greetings. Ask your FIRST real question immediately.\n` +
-    `11. SYSTEM_SILENCE trigger: The candidate has gone quiet. React naturally — "Take your time, no rush" or "Would it help if I rephrased the question?" or "Feel free to think out loud." Do NOT ask a new question.\n` +
-    `12. SYSTEM_END trigger: Close the interview warmly and professionally. Thank the candidate, give brief closing comments (what stood out, next steps), say goodbye. 3–4 sentences. No new question.` +
+    `5. WRONG ANSWER: Do NOT move on silently. Push back once — say something like "That's not quite right — let me push back a bit" and give them a chance to reconsider or offer a small hint. If after that second attempt they STILL cannot answer correctly, acknowledge it gracefully and move on naturally: "No worries, let's not get stuck here — let me ask you something different." Never probe the same wrong answer more than twice total.\n` +
+    `6. STUCK CANDIDATE RULE: If you can count 2 or more consecutive candidate messages on the same question that show confusion, wrong answers, or very short non-answers (like "I don't know", "not sure", "umm"), you MUST move on. Say something like "That's okay, these things can be tricky — let's move to the next topic." Do NOT keep probing the same question endlessly.\n` +
+    `7. PARTIAL ANSWER: Acknowledge what is correct ("You're right about X"), then probe the missing part once: "Can you also walk me through Y?" If they still miss it, accept what they gave and move on.\n` +
+    `8. VAGUE ANSWER: Ask for specifics once — "Can you elaborate?", "Give me a concrete example.", "Walk me through the exact steps." If the follow-up is still vague, accept and move on.\n` +
+    `9. CORRECT ANSWER (hard difficulty): Push further — "Interesting. Now what happens at 10x scale?", "What are the edge cases?"\n` +
+    `10. After acknowledging an answer, ALWAYS end your turn with a question or a prompting statement to keep the dialogue going.\n` +
+    `10b. MISBEHAVIOR POLICY — applies to profanity, insults, harassment, sexual/violent language, deliberately off-topic gibberish to derail the interview, or any disrespectful conduct:\n` +
+    `  - FIRST offense: Calmly but firmly address it in character. Example: "I'd appreciate if we kept this professional — let's refocus on the interview." End with the same question rephrased. You MUST append the exact token [WARN_MISBEHAVIOR] at the very end of your response (after the last sentence), on its own.\n` +
+    `  - SECOND offense (i.e. if you can see a [WARN_MISBEHAVIOR] tag already in the conversation history): Do not continue. Say something like "I'm afraid I'll have to end this session — professional conduct is expected throughout. Thank you for your time." You MUST append the exact token [END_MISBEHAVIOR] at the very end of your response.\n` +
+    `  - The tokens [WARN_MISBEHAVIOR] and [END_MISBEHAVIOR] are invisible to the candidate; they are stripped before display. Always place them at the very end.\n` +
+    `11. SYSTEM_INIT trigger: Skip greetings. Ask your FIRST real question immediately.\n` +
+    `12. SYSTEM_SILENCE trigger: The candidate has gone quiet. React naturally — "Take your time, no rush" or "Would it help if I rephrased the question?" or "Feel free to think out loud." Do NOT ask a new question.\n` +
+    `13. SYSTEM_END trigger: Close the interview warmly and professionally. Thank the candidate, give brief closing comments (what stood out, next steps), say goodbye. 3–4 sentences. No new question.\n` +
+    `14. SYSTEM_TIME_WARNING_5 trigger: The interview is nearing its end — adjust your pacing naturally like a real interviewer would. Do NOT mention time or the clock. Simply transition smoothly: wrap up the current topic and move to the single most important remaining question. Keep your response natural and brief.\n` +
+    `15. SYSTEM_TIME_WARNING_2 trigger: Almost out of time — do NOT say how many minutes are left. Naturally signal that you are wrapping up: ask one final, concise question that will round off the interview well. Example tone: "Before we finish, I'd like to ask you one last thing..." No mention of time.\n` +
+    `16. SYSTEM_TIME_WARNING_1 trigger: Time is essentially up. Do NOT ask any new question and do NOT mention time. Deliver a natural, warm closing as any real interviewer would — thank the candidate, give a brief positive closing remark, and say goodbye. 2–3 sentences max.` +
     timePacing
   );
 }
@@ -219,9 +235,19 @@ export async function POST(
       }
     }
 
-    const aiText = (
-      await callGemini(apiKey, buildSystemPrompt(iv, timeRemainingSeconds, institutionQuestions.length > 0 ? institutionQuestions : undefined), history, toSend)
+    let aiText = (
+      await callGemini(apiKey, buildSystemPrompt(iv, timeRemainingSeconds, institutionQuestions.length > 0 ? institutionQuestions : undefined, iv.resumeText ?? null), history, toSend)
     ) || 'Could you tell me a bit more about your background?';
+
+    // Detect and strip misbehavior action tokens
+    let misbehaviorAction: 'warn' | 'end' | null = null;
+    if (aiText.includes('[END_MISBEHAVIOR]')) {
+      misbehaviorAction = 'end';
+      aiText = aiText.replace('[END_MISBEHAVIOR]', '').trim();
+    } else if (aiText.includes('[WARN_MISBEHAVIOR]')) {
+      misbehaviorAction = 'warn';
+      aiText = aiText.replace('[WARN_MISBEHAVIOR]', '').trim();
+    }
 
     log.push({ speaker: 'ai', message: aiText, type: 'text', timestamp: new Date().toISOString() });
 
@@ -230,7 +256,7 @@ export async function POST(
       data: { conversationLog: log },
     });
 
-    return NextResponse.json({ message: aiText, conversationLog: log });
+    return NextResponse.json({ message: aiText, conversationLog: log, misbehaviorAction });
   } catch (error: any) {
     console.error('Chat error:', error);
     // Surface quota / auth errors with their real HTTP status

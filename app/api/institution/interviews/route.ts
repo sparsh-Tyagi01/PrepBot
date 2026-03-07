@@ -30,11 +30,19 @@ export async function GET() {
       },
       include: {
         _count: { select: { questionBanks: true, interviewSessions: true } },
+        branches: { select: { branchId: true, branch: { select: { id: true, name: true, code: true } } } },
+        sections: { select: { sectionId: true, section: { select: { id: true, name: true, code: true } } } },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ interviewTypes });
+    const shaped = interviewTypes.map(t => ({
+      ...t,
+      branches: t.branches.map(b => b.branch),
+      sections: t.sections.map(s => s.section),
+    }));
+
+    return NextResponse.json({ interviewTypes: shaped });
   } catch (error) {
     console.error("Get interview types error:", error);
     return NextResponse.json({ error: "Failed to fetch interview types" }, { status: 500 });
@@ -55,30 +63,46 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, description, icon, duration, difficulty, branchId, sectionId } = body;
+    const { name, description, icon, duration, difficulty, requireResume, branchIds, sectionIds } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
+    const branchArr: string[] = Array.isArray(branchIds) ? branchIds.filter(Boolean) : [];
+    const sectionArr: string[] = Array.isArray(sectionIds) ? sectionIds.filter(Boolean) : [];
+
     const interviewType = await prisma.interviewType.create({
       data: {
-        institution: { connect: { id: institutionId } },
+        institutionId,
         name,
-        description,
+        description: description || null,
         icon: icon || "📋",
         isGlobal: false,
         duration: duration ? Number(duration) : null,
         difficulty: difficulty || null,
-        branchId: branchId || null,
-        sectionId: sectionId || null,
+        requireResume: requireResume === true,
+        branches: branchArr.length
+          ? { create: branchArr.map((branchId) => ({ branchId })) }
+          : undefined,
+        sections: sectionArr.length
+          ? { create: sectionArr.map((sectionId) => ({ sectionId })) }
+          : undefined,
       },
       include: {
         _count: { select: { questionBanks: true, interviewSessions: true } },
+        branches: { select: { branch: { select: { id: true, name: true, code: true } } } },
+        sections: { select: { section: { select: { id: true, name: true, code: true } } } },
       },
     });
 
-    return NextResponse.json({ interviewType }, { status: 201 });
+    const shaped = {
+      ...interviewType,
+      branches: interviewType.branches.map(b => b.branch),
+      sections: interviewType.sections.map(s => s.section),
+    };
+
+    return NextResponse.json({ interviewType: shaped }, { status: 201 });
   } catch (error) {
     console.error("Create interview type error:", error);
     return NextResponse.json({ error: "Failed to create interview type" }, { status: 500 });

@@ -49,11 +49,11 @@ model Branch {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  institution    Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  institution    Institution          @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   sections       BranchSection[]
   users          User[]
   questionBanks  QuestionBank[]
-  interviewTypes InterviewType[]
+  interviewTypes InterviewTypeBranch[]
 
   @@index([institutionId])
 }
@@ -67,10 +67,10 @@ model BranchSection {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  branch         Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch         Branch               @relation(fields: [branchId], references: [id], onDelete: Cascade)
   users          User[]
   questionBanks  QuestionBank[]
-  interviewTypes InterviewType[]
+  interviewTypes InterviewTypeSection[]
 
   @@index([branchId])
 }
@@ -175,25 +175,44 @@ model VerificationToken {
 model InterviewType {
   id              String   @id @default(cuid())
   institutionId   String?
-  branchId        String?  // if set: only visible to students in this branch
-  sectionId       String?  // if set: only visible to students in this section
   name            String   // Technical, Behavioral, System Design, HR, etc.
   description     String?  @db.Text
   icon            String?
   isGlobal        Boolean  @default(false) // Global types available to all institutions
   duration        Int?     // Fixed duration in minutes; set by institution (null = student chooses)
   difficulty      String?  // Fixed difficulty; set by institution (null = student chooses)
+  requireResume   Boolean  @default(false) // Whether students must upload a resume before starting
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  institution       Institution?       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  branch            Branch?            @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  section           BranchSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  institution       Institution?           @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  branches          InterviewTypeBranch[]  // branches this type is visible to (empty = all branches)
+  sections          InterviewTypeSection[] // sections this type is visible to (empty = all sections)
   questionBanks     QuestionBank[]
   interviewSessions InterviewSession[]
 
   @@index([institutionId])
+}
+
+model InterviewTypeBranch {
+  interviewTypeId String
+  branchId        String
+
+  interviewType InterviewType @relation(fields: [interviewTypeId], references: [id], onDelete: Cascade)
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([interviewTypeId, branchId])
   @@index([branchId])
+}
+
+model InterviewTypeSection {
+  interviewTypeId String
+  sectionId       String
+
+  interviewType InterviewType @relation(fields: [interviewTypeId], references: [id], onDelete: Cascade)
+  section       BranchSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@id([interviewTypeId, sectionId])
   @@index([sectionId])
 }
 
@@ -288,6 +307,9 @@ model InterviewSession {
   // Recording
   videoRecording    String?   // URL to video recording
   audioRecording    String?   // URL to audio recording
+
+  // Resume
+  resumeText        String?   @db.Text  // Extracted text from candidate's resume
   
   // Metadata
   questionsAsked    Json      // Array of questions asked with answers

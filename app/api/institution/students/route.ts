@@ -87,3 +87,66 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Failed to remove student" }, { status: 500 });
   }
 }
+
+// PATCH — assign or move a student to a different branch / section
+export async function PATCH(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id || session.user.role !== "institution-admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { studentId, branchId, sectionId } = await request.json();
+    if (!studentId) return NextResponse.json({ error: "studentId required" }, { status: 400 });
+
+    const admin = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { institutionId: true },
+    });
+    if (!admin?.institutionId) {
+      return NextResponse.json({ error: "No institution linked" }, { status: 404 });
+    }
+
+    // Confirm the student belongs to this institution
+    const student = await prisma.user.findFirst({
+      where: { id: studentId, institutionId: admin.institutionId, role: "student" },
+    });
+    if (!student) {
+      return NextResponse.json({ error: "Student not found in your institution" }, { status: 404 });
+    }
+
+    // If a branchId is provided, confirm it belongs to this institution
+    if (branchId) {
+      const branch = await prisma.branch.findFirst({
+        where: { id: branchId, institutionId: admin.institutionId },
+      });
+      if (!branch) return NextResponse.json({ error: "Branch not found" }, { status: 404 });
+    }
+
+    // If a sectionId is provided, confirm it belongs to the given branch
+    if (sectionId) {
+      const section = await prisma.branchSection.findFirst({
+        where: { id: sectionId, branchId: branchId ?? undefined },
+      });
+      if (!section) return NextResponse.json({ error: "Section not found in branch" }, { status: 404 });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: studentId },
+      data: {
+        branchId: branchId ?? null,
+        sectionId: sectionId ?? null,
+      },
+      select: {
+        id: true,
+        branch: { select: { id: true, name: true, code: true } },
+        section: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    return NextResponse.json({ student: updated });
+  } catch (error) {
+    console.error("Assign branch/section error:", error);
+    return NextResponse.json({ error: "Failed to update student" }, { status: 500 });
+  }
+}

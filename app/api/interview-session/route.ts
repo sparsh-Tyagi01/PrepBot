@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { interviewTypeId, aiInterviewerId, title, difficulty, duration } = body;
+    const { interviewTypeId, aiInterviewerId, title, difficulty, duration, resumeText } = body;
 
     if (!interviewTypeId || !aiInterviewerId || !title || !difficulty || !duration) {
       return NextResponse.json(
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
         duration,
         status: 'pending',
         questionsAsked: [],
+        resumeText: typeof resumeText === 'string' && resumeText.trim() ? resumeText.trim() : null,
       },
       include: {
         aiInterviewer: true,

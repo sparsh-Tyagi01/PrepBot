@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users, Search, Mail, Calendar, Trash2, BarChart2, X,
   TrendingUp, Award, Clock, ChevronDown, ChevronUp, BookOpen,
-  GitBranch, Layers,
+  GitBranch, Layers, UserCog,
 } from "lucide-react";
 
 /* ─── Types ─── */
@@ -18,8 +18,8 @@ interface Student {
   email: string;
   department: string | null;
   yearOfStudy: number | null;
-  branch: string | null;
-  section: string | null;
+  branch: { id: string; name: string; code: string } | null;
+  section: { id: string; name: string; code: string } | null;
   createdAt: string;
   _count: { interviewSessions: number };
 }
@@ -56,6 +56,13 @@ interface StudentAnalytics {
   sessions: SessionSummary[];
 }
 
+interface BranchWithSections {
+  id: string;
+  name: string;
+  code: string;
+  sections: { id: string; name: string; code: string }[];
+}
+
 /* ─── helpers ─── */
 const fmt = (ds: string) =>
   new Date(ds).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -64,6 +71,126 @@ const scoreColor = (s: number) =>
   s >= 80 ? "text-green-400" : s >= 60 ? "text-amber-400" : "text-red-400";
 const scoreBg = (s: number) =>
   s >= 80 ? "bg-green-500/15 border-green-500/30" : s >= 60 ? "bg-amber-500/15 border-amber-500/30" : "bg-red-500/15 border-red-500/30";
+
+/* ─── Assign Branch/Section Modal ─── */
+function AssignModal({
+  student,
+  branches,
+  onClose,
+  onSave,
+}: {
+  student: Student;
+  branches: BranchWithSections[];
+  onClose: () => void;
+  onSave: (branchId: string | null, sectionId: string | null) => void;
+}) {
+  const [branchId, setBranchId] = useState<string>(student.branch?.id ?? "");
+  const [sectionId, setSectionId] = useState<string>(student.section?.id ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const selectedBranch = branches.find((b) => b.id === branchId);
+
+  const handleBranchChange = (id: string) => {
+    setBranchId(id);
+    setSectionId(""); // reset section when branch changes
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/institution/students", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: student.id,
+          branchId: branchId || null,
+          sectionId: sectionId || null,
+        }),
+      });
+      if (res.ok) {
+        onSave(branchId || null, sectionId || null);
+        onClose();
+      } else {
+        const d = await res.json();
+        setError(d.error ?? "Failed to save.");
+      }
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm bg-slate-900 border border-slate-700/60 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
+          <div className="flex items-center gap-2">
+            <UserCog size={16} className="text-cyan-400" />
+            <h2 className="text-white font-semibold text-sm">Assign Branch &amp; Section</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 rounded-full bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white font-semibold text-sm shrink-0">
+              {student.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium text-white text-sm truncate">{student.name}</p>
+              <p className="text-xs text-slate-400 truncate">{student.email}</p>
+            </div>
+          </div>
+          {error && (
+            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 mb-4">{error}</p>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-medium">Branch</label>
+              <select
+                value={branchId}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                className="w-full h-9 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-sm px-2 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              >
+                <option value="">— No branch —</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-medium">Section</label>
+              <select
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+                disabled={!branchId || !selectedBranch?.sections.length}
+                className="w-full h-9 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-sm px-2 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:opacity-40"
+              >
+                <option value="">— No section —</option>
+                {selectedBranch?.sections.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button type="submit" disabled={saving} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-sm h-9">
+                {saving ? "Saving…" : "Save"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={onClose} className="flex-1 text-sm h-9">
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ─── Student Analytics Modal ─── */
 function StudentAnalyticsModal({
@@ -99,8 +226,8 @@ function StudentAnalyticsModal({
               </h2>
               <p className="text-slate-400 text-xs">
                 {data?.student.email}
-                {data?.student.branch ? ` · ${data.student.branch}` : ""}
-                {data?.student.section ? ` · Sec ${data.student.section}` : ""}
+                {data?.student.branch ? ` · ${data.student.branch.name}` : ""}
+                {data?.student.section ? ` · Sec ${data.student.section.name}` : ""}
               </p>
             </div>
           </div>
@@ -250,15 +377,23 @@ function StudentAnalyticsModal({
 /* ─── Main page ─── */
 export default function InstitutionStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [branches, setBranches] = useState<BranchWithSections[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [analyticsStudentId, setAnalyticsStudentId] = useState<string | null>(null);
+  const [assigningStudent, setAssigningStudent] = useState<Student | null>(null);
 
   useEffect(() => {
-    fetch("/api/institution/students")
-      .then((r) => r.json())
-      .then((d) => { setStudents(d.students ?? []); setLoading(false); })
+    Promise.all([
+      fetch("/api/institution/students").then((r) => r.json()),
+      fetch("/api/institution/branches").then((r) => r.json()),
+    ])
+      .then(([students, branchData]) => {
+        setStudents(students.students ?? []);
+        setBranches(branchData.branches ?? []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -266,8 +401,8 @@ export default function InstitutionStudentsPage() {
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.email.toLowerCase().includes(search.toLowerCase()) ||
-      (s.branch ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (s.section ?? "").toLowerCase().includes(search.toLowerCase())
+      (s.branch?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (s.section?.name ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleRemove = async (studentId: string, name: string) => {
@@ -360,12 +495,12 @@ export default function InstitutionStudentsPage() {
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                   {student.branch ? (
                     <span className="flex items-center gap-1 text-xs text-slate-300 bg-slate-700/50 border border-slate-600/40 rounded-full px-2 py-0.5">
-                      <GitBranch size={10} />{student.branch}
+                      <GitBranch size={10} />{student.branch.name}
                     </span>
                   ) : null}
                   {student.section ? (
                     <span className="flex items-center gap-1 text-xs text-slate-300 bg-slate-700/50 border border-slate-600/40 rounded-full px-2 py-0.5">
-                      <Layers size={10} />Sec {student.section}
+                      <Layers size={10} />Sec {student.section.name}
                     </span>
                   ) : null}
                   {!student.branch && !student.section && (
@@ -407,6 +542,15 @@ export default function InstitutionStudentsPage() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 h-8 px-2"
+                    onClick={() => setAssigningStudent(student)}
+                    title="Assign branch / section"
+                  >
+                    <UserCog size={13} />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="border-red-500/30 text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 px-2"
                     onClick={() => handleRemove(student.id, student.name)}
                     disabled={removingId === student.id}
@@ -426,6 +570,29 @@ export default function InstitutionStudentsPage() {
         <StudentAnalyticsModal
           studentId={analyticsStudentId}
           onClose={() => setAnalyticsStudentId(null)}
+        />
+      )}
+
+      {/* Assign branch/section modal */}
+      {assigningStudent && (
+        <AssignModal
+          student={assigningStudent}
+          branches={branches}
+          onClose={() => setAssigningStudent(null)}
+          onSave={(branchId, sectionId) => {
+            setStudents((prev) =>
+              prev.map((s) => {
+                if (s.id !== assigningStudent.id) return s;
+                const branch = branches.find((b) => b.id === branchId) ?? null;
+                const section = branch?.sections.find((sec) => sec.id === sectionId) ?? null;
+                return {
+                  ...s,
+                  branch: branch ? { id: branch.id, name: branch.name, code: branch.code } : null,
+                  section: section ? { id: section.id, name: section.name, code: section.code } : null,
+                };
+              })
+            );
+          }}
         />
       )}
     </div>

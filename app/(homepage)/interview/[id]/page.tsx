@@ -58,8 +58,14 @@ export default function LiveInterviewPage() {
   const [isRecording,       setIsRecording]       = useState(false);
   const [finalTranscript,   setFinalTranscript]   = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
-  const recognitionRef = useRef<any>(null);
-  const isRecordingRef  = useRef(false);
+  const recognitionRef     = useRef<any>(null);
+  const isRecordingRef     = useRef(false);
+  const autoListenRef      = useRef(true);   // auto-start mic after AI finishes
+  const speechSilenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const accumulatedRef     = useRef('');     // running final transcript for auto-submit
+  const isAISpeakingRef    = useRef(false);  // stable ref for async callbacks
+  const isWaitingForAIRef  = useRef(false);  // stable ref for async callbacks
+  const timeWarningsSentRef = useRef(new Set<number>()); // tracks which thresholds already notified AI
 
   // Interview ending & silence detection
   const [isEnding,       setIsEnding]       = useState(false);
@@ -296,25 +302,24 @@ export default function LiveInterviewPage() {
   const doRedirect = async () => {
     if (hasRedirectedRef.current) return;
     hasRedirectedRef.current = true;
+    // Ensure session is marked completed before proceeding
     await fetch(`/api/interview-session/${sessionId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'completed' }),
     });
+    // Fire report generation now (non-blocking) so it starts before the page load
+    fetch(`/api/interview-session/${sessionId}/generate-report`, { method: 'POST' }).catch(() => {});
     router.push(`/reports?sessionId=${sessionId}`);
   };
 
   /* ─── Submit verbal / code answer ─── */
   const submitAnswer = useCallback(async (msg: string, type: 'text' | 'code') => {
     if (!msg.trim() || isWaitingForAI) return;
-    // Stop recording
-    if (isRecordingRef.current) {
-      recognitionRef.current?.stop?.();
-      setIsRecording(false);
-      isRecordingRef.current = false;
-    }
-    // Clear silence timer — user is actively responding
+    // Stop listening and clear all timers
+    stopListening();
     if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+    accumulatedRef.current = '';
     setFinalTranscript('');
     setInterimTranscript('');
     setIsWaitingForAI(true);
@@ -339,6 +344,21 @@ export default function LiveInterviewPage() {
             }
           }
         }
+        // If the AI terminated due to misbehavior, let the AI finish speaking then end
+        if (data.misbehaviorAction === 'end') {
+          autoListenRef.current = false;
+          isEndingRef.current = true;
+          setIsEnding(true);
+          recognitionRef.current?.stop?.();
+          setTimeout(doRedirect, 10000); // fallback redirect if TTS doesn't fire
+        } else {
+          // Auto-start listening right after state settles
+          if (autoListenRef.current && !isEndingRef.current) {
+            setTimeout(() => {
+              if (!isEndingRef.current) startListening();
+            }, 200);
+          }
+        }
         setCodeAnswer('');
       } else {
         const errMsg = (await readErrorBody(res)) || (res.status === 429
@@ -348,7 +368,43 @@ export default function LiveInterviewPage() {
         showError(errMsg);
       }
     } finally { setIsWaitingForAI(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWaitingForAI, sessionId, session]);
+
+  // Keep submitAnswerRef in sync
+  useEffect(() => { submitAnswerRef.current = submitAnswer; }, [submitAnswer]);
+
+  // Sync boolean states to refs so async closures always read latest value
+  useEffect(() => { isAISpeakingRef.current = isAISpeaking; }, [isAISpeaking]);
+  useEffect(() => { isWaitingForAIRef.current = isWaitingForAI; }, [isWaitingForAI]);
+
+  // Proactively notify the AI when time crosses 5 min / 2 min / 1 min thresholds
+  useEffect(() => {
+    const THRESHOLDS = [300, 120, 60];
+    const hit = THRESHOLDS.find(t => timeRemaining === t);
+    if (!hit || !session || isEndingRef.current) return;
+    if (timeWarningsSentRef.current.has(hit)) return;
+    timeWarningsSentRef.current.add(hit);
+    // If AI is already mid-response the system prompt timePacing will cover it next turn
+    if (isAISpeakingRef.current || isWaitingForAIRef.current) return;
+    const minsLeft = Math.round(hit / 60);
+    stopListening();
+    setIsWaitingForAI(true);
+    fetch(`/api/interview-session/${sessionId}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: `[SYSTEM_TIME_WARNING_${minsLeft}]`, type: 'text', timeRemainingSeconds: hit }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || isEndingRef.current) return;
+        setConversationLog(data.conversationLog);
+        const last = data.conversationLog.at(-1);
+        if (last?.speaker === 'ai') { setCurrentAIMessage(last.message); setIsAISpeaking(true); }
+      })
+      .finally(() => setIsWaitingForAI(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRemaining]);
 
   /* ─── Speech Recognition ─── */
   const initSpeechRecognition = () => {
@@ -367,8 +423,25 @@ export default function LiveInterviewPage() {
         if (e.results[i].isFinal) final += t + ' ';
         else interim += t;
       }
-      if (final) { setFinalTranscript(p => p + final); setInterimTranscript(''); }
-      else setInterimTranscript(interim);
+      if (final) {
+        accumulatedRef.current += final;
+        setFinalTranscript(accumulatedRef.current);
+        setInterimTranscript('');
+      } else {
+        setInterimTranscript(interim);
+      }
+
+      // Auto-submit: reset the silence timer on every speech event.
+      // If the user stops speaking for 3 s after saying something, submit automatically.
+      if (speechSilenceTimer.current) clearTimeout(speechSilenceTimer.current);
+      if (accumulatedRef.current.trim()) {
+        speechSilenceTimer.current = setTimeout(() => {
+          const answer = accumulatedRef.current.trim();
+          if (answer && isRecordingRef.current && !isEndingRef.current) {
+            submitAnswerRef.current?.(answer, 'text');
+          }
+        }, 3000);
+      }
     };
     r.onerror = (e: any) => {
       if (e.error !== 'no-speech') { setIsRecording(false); isRecordingRef.current = false; }
@@ -381,24 +454,39 @@ export default function LiveInterviewPage() {
     recognitionRef.current = r;
   };
 
+  // Keep a stable ref to submitAnswer so onresult closure can call it
+  const submitAnswerRef = useRef<((msg: string, type: 'text' | 'code') => void) | null>(null);
+
+  const startListening = () => {
+    if (!recognitionRef.current || isRecordingRef.current || isEndingRef.current) return;
+    accumulatedRef.current = '';
+    setFinalTranscript('');
+    setInterimTranscript('');
+    try {
+      recognitionRef.current.start();
+      setIsRecording(true);
+      isRecordingRef.current = true;
+    } catch {}
+  };
+
+  const stopListening = () => {
+    if (speechSilenceTimer.current) { clearTimeout(speechSilenceTimer.current); speechSilenceTimer.current = null; }
+    if (!isRecordingRef.current) return;
+    recognitionRef.current?.stop?.();
+    setIsRecording(false);
+    isRecordingRef.current = false;
+  };
+
   const toggleRecording = () => {
     if (!recognitionRef.current) {
       alert('Speech recognition requires Chrome or Edge browser.');
       return;
     }
     if (isRecordingRef.current) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-      isRecordingRef.current = false;
+      stopListening();
     } else {
-      if (isAISpeaking) return; // Don't record while AI speaks
-      setFinalTranscript('');
-      setInterimTranscript('');
-      try {
-        recognitionRef.current.start();
-        setIsRecording(true);
-        isRecordingRef.current = true;
-      } catch {}
+      if (isAISpeaking) return;
+      startListening();
     }
   };
 
@@ -526,7 +614,12 @@ export default function LiveInterviewPage() {
             avatar={session.aiInterviewer.avatar}
             isSpeaking={isAISpeaking}
             text={currentAIMessage}
-            onSpeakingComplete={() => { setIsAISpeaking(false); if (isEndingRef.current) doRedirect(); }}
+            onSpeakingComplete={() => {
+              setIsAISpeaking(false);
+              if (isEndingRef.current) { doRedirect(); return; }
+              // Auto-start mic once AI finishes speaking
+              if (autoListenRef.current) setTimeout(() => startListening(), 300);
+            }}
           />
 
         </div>
@@ -568,7 +661,7 @@ export default function LiveInterviewPage() {
             {isVideoOn ? <Video size={20} className="text-white" /> : <VideoOff size={20} className="text-white" />}
           </button>
 
-          {/* ★ Main MIC button — speak answer */}
+          {/* ★ Main MIC button — tap to manually stop/start */}
           <div className="flex flex-col items-center gap-1">
             <button
               onClick={toggleRecording}
@@ -584,21 +677,23 @@ export default function LiveInterviewPage() {
               <Mic size={32} className="text-white" />
             </button>
             <span className="text-xs text-slate-400">
-              {isRecording ? 'Tap to stop' : isAISpeaking ? 'AI speaking...' : 'Tap to speak'}
+              {isRecording
+                ? finalTranscript ? 'Submitting soon…' : 'Listening…'
+                : isAISpeaking ? 'AI speaking…'
+                : isWaitingForAI ? 'Processing…'
+                : 'Auto-listening'}
             </span>
           </div>
 
-          {/* Submit answer */}
-          <button
-            onClick={() => submitAnswer(finalTranscript, 'text')}
-            disabled={!hasAnswer || isWaitingForAI}
-            className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all
-              ${hasAnswer && !isWaitingForAI
-                ? 'bg-green-600/80 border-green-500 hover:bg-green-600'
-                : 'bg-slate-800/50 border-slate-700 opacity-50 cursor-not-allowed'}`}
-          >
-            <Send size={20} className="text-white" />
-          </button>
+          {/* Manual send — only visible when there's text (fallback) */}
+          {finalTranscript.trim() && !isWaitingForAI && (
+            <button
+              onClick={() => submitAnswer(finalTranscript, 'text')}
+              className="w-12 h-12 rounded-full flex items-center justify-center border transition-all bg-green-600/80 border-green-500 hover:bg-green-600"
+            >
+              <Send size={20} className="text-white" />
+            </button>
+          )}
 
           {/* Code editor toggle */}
           <button

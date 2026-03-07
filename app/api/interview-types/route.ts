@@ -7,12 +7,10 @@ import { prisma } from '@/lib/prisma';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    // Allow explicit override via query param (used by institution admin portal)
     let institutionId = searchParams.get('institutionId');
     let branchId: string | null = null;
     let sectionId: string | null = null;
 
-    // If no explicit param, resolve from the authenticated user's linked institution
     if (!institutionId) {
       const session = await getServerSession(authOptions);
       if (session?.user?.id) {
@@ -26,22 +24,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Build filter: global types + institution types that match student's branch/section
+    // Build filter:
+    // - Always include global types
+    // - For institution types: include if no branches/sections are targeted (visible to all),
+    //   OR if student's branch is in the targeted branches,
+    //   OR if student's section is in the targeted sections
     let where: Record<string, unknown>;
     if (institutionId) {
-      // Institution-level conditions: accessible if the type targets this student specifically
       const institutionConditions: Record<string, unknown>[] = [
-        // Institution-wide (no branch/section restriction)
-        { institutionId, branchId: null, sectionId: null },
+        // Institution-wide: no targeting at all
+        {
+          institutionId,
+          branches: { none: {} },
+          sections: { none: {} },
+        },
       ];
+
       if (branchId) {
-        // Branch-level (targeted at student's branch, no section restriction)
-        institutionConditions.push({ institutionId, branchId, sectionId: null });
+        // Targeted to student's branch (and not further narrowed to a specific section)
+        institutionConditions.push({
+          institutionId,
+          branches: { some: { branchId } },
+          sections: { none: {} },
+        });
       }
+
       if (sectionId) {
-        // Section-level (targeted at student's exact section)
-        institutionConditions.push({ institutionId, sectionId });
+        // Targeted to student's exact section
+        institutionConditions.push({
+          institutionId,
+          sections: { some: { sectionId } },
+        });
       }
+
       where = { OR: [{ isGlobal: true }, ...institutionConditions] };
     } else {
       where = { isGlobal: true };
@@ -50,6 +65,16 @@ export async function GET(request: NextRequest) {
     const interviewTypes = await prisma.interviewType.findMany({
       where,
       orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        icon: true,
+        isGlobal: true,
+        duration: true,
+        difficulty: true,
+        requireResume: true,
+      },
     });
 
     return NextResponse.json(interviewTypes);

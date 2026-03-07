@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Code2, MessageSquare, Briefcase, Network, BarChart2, ChevronRight, Loader2, Clock, Zap } from 'lucide-react';
+import { Code2, MessageSquare, Briefcase, Network, BarChart2, ChevronRight, Loader2, Clock, Zap, Globe, Building2, Upload, FileText, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import AIAvatar from '@/components/AIAvatar';
 
 // Fixed interviewer per interview type — names match prisma/seed.ts exactly
@@ -47,6 +47,7 @@ interface InterviewType {
   isGlobal: boolean;
   duration: number | null;
   difficulty: string | null;
+  requireResume: boolean;
 }
 
 export default function StartInterviewPage() {
@@ -63,6 +64,13 @@ export default function StartInterviewPage() {
   const [loading,             setLoading]             = useState(false);
   const [isSpeaking,          setIsSpeaking]          = useState(false);
   const [dataReady,           setDataReady]           = useState(false);
+
+  // Resume state
+  const [resumeFile,          setResumeFile]          = useState<File | null>(null);
+  const [resumeText,          setResumeText]          = useState<string | null>(null);
+  const [resumeParsing,       setResumeParsing]       = useState(false);
+  const [resumeError,         setResumeError]         = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -89,6 +97,10 @@ export default function StartInterviewPage() {
       ?? null;
     setSelectedType(type);
     setAssignedInterviewer(matched);
+    // Reset resume when switching type
+    setResumeFile(null);
+    setResumeText(null);
+    setResumeError(null);
     // If the type has a fixed duration, lock in that value
     if (type.duration) setDuration(type.duration);
     // If the type has a fixed difficulty, lock in that value
@@ -99,8 +111,47 @@ export default function StartInterviewPage() {
     // isSpeaking is turned off by onSpeakingComplete callback — no hard timeout
   };
 
+  const handleResumeUpload = async (file: File) => {
+    setResumeFile(file);
+    setResumeError(null);
+    setResumeText(null);
+    setResumeParsing(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/resume/parse', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        setResumeError(data.error ?? 'Failed to parse resume');
+        setResumeFile(null);
+      } else {
+        setResumeText(data.text);
+      }
+    } catch {
+      setResumeError('Failed to read resume. Please try a different file.');
+      setResumeFile(null);
+    } finally {
+      setResumeParsing(false);
+    }
+  };
+
+  const clearResume = () => {
+    setResumeFile(null);
+    setResumeText(null);
+    setResumeError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleStartInterview = async () => {
     if (!selectedType || !assignedInterviewer) return;
+
+    // Enforce resume requirement
+    const needsResume = selectedType.isGlobal || selectedType.requireResume;
+    if (needsResume && !resumeText) {
+      setResumeError('Please upload your resume before starting.');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch('/api/interview-session', {
@@ -112,6 +163,7 @@ export default function StartInterviewPage() {
           title: `${selectedType.name} Interview`,
           difficulty,
           duration,
+          resumeText: resumeText ?? undefined,
         }),
       });
       if (res.ok) {
@@ -157,13 +209,26 @@ export default function StartInterviewPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25 }}
+            className="space-y-10"
           >
-            <div className="grid sm:grid-cols-2 gap-5">
-              {interviewTypes.length === 0
-                ? [1, 2, 3, 4].map(i => (
-                    <div key={i} className="h-40 rounded-2xl bg-slate-800/40 animate-pulse" />
-                  ))
-                : interviewTypes.map(type => {
+            {/* Loading skeletons */}
+            {interviewTypes.length === 0 && (
+              <div className="grid sm:grid-cols-2 gap-5">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-40 rounded-2xl bg-slate-800/40 animate-pulse" />
+                ))}
+              </div>
+            )}
+
+            {/* ── General Interviews ───────────────────────────── */}
+            {interviewTypes.some(t => t.isGlobal) && (
+              <div>
+                <div className="flex items-center gap-2 mb-5">
+                  <Globe size={15} className="text-purple-400" />
+                  <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">General Interviews</h2>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-5">
+                  {interviewTypes.filter(t => t.isGlobal).map(type => {
                     const meta = TYPE_META[type.name];
                     const Icon = meta?.icon ?? Code2;
                     return (
@@ -174,26 +239,72 @@ export default function StartInterviewPage() {
                         onClick={() => handleSelectType(type)}
                         className="group relative text-left p-6 rounded-2xl bg-slate-800/40 hover:bg-slate-800/70 border border-slate-700/50 hover:border-purple-500/50 transition-all overflow-hidden"
                       >
-                        <div
-                          className={`absolute inset-0 bg-linear-to-br ${meta?.from ?? 'from-purple-600'} ${meta?.to ?? 'to-blue-600'} opacity-0 group-hover:opacity-5 transition-opacity`}
-                        />
-                        <div
-                          className={`w-12 h-12 rounded-2xl bg-linear-to-br ${meta?.from ?? 'from-purple-600'} ${meta?.to ?? 'to-blue-600'} flex items-center justify-center mb-4 shadow-lg`}
-                        >
+                        <div className={`absolute inset-0 bg-linear-to-br ${meta?.from ?? 'from-purple-600'} ${meta?.to ?? 'to-blue-600'} opacity-0 group-hover:opacity-5 transition-opacity`} />
+                        <div className={`w-12 h-12 rounded-2xl bg-linear-to-br ${meta?.from ?? 'from-purple-600'} ${meta?.to ?? 'to-blue-600'} flex items-center justify-center mb-4 shadow-lg`}>
                           <Icon size={24} className="text-white" />
                         </div>
                         <h3 className="text-lg font-semibold text-white mb-1">{type.name}</h3>
-                        <p className="text-sm text-slate-400 mb-4">
-                          {meta?.description ?? type.description}
-                        </p>
+                        <p className="text-sm text-slate-400 mb-4">{meta?.description ?? type.description}</p>
                         <div className="flex items-center gap-1 text-purple-400 text-sm font-medium">
-                          Select
-                          <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                          Select <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
                         </div>
                       </motion.button>
                     );
                   })}
-            </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Institution Interviews ───────────────────────── */}
+            {interviewTypes.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-5">
+                  <Building2 size={15} className="text-amber-400" />
+                  <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Your Institution</h2>
+                </div>
+                {interviewTypes.some(t => !t.isGlobal) ? (
+                  <div className="grid sm:grid-cols-2 gap-5">
+                    {interviewTypes.filter(t => !t.isGlobal).map(type => (
+                      <motion.button
+                        key={type.id}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleSelectType(type)}
+                        className="group relative text-left p-6 rounded-2xl bg-slate-800/40 hover:bg-slate-800/70 border border-slate-700/50 hover:border-amber-500/50 transition-all overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-linear-to-br from-amber-600 to-orange-600 opacity-0 group-hover:opacity-5 transition-opacity" />
+                        <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-amber-500/30 flex items-center justify-center mb-4 shadow-lg text-2xl">
+                          {type.icon ?? '📋'}
+                        </div>
+                        <h3 className="text-lg font-semibold text-white mb-1">{type.name}</h3>
+                        <p className="text-sm text-slate-400 mb-4 line-clamp-2">{type.description ?? 'Custom interview from your institution'}</p>
+                        <div className="flex items-center gap-2">
+                          {type.difficulty && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
+                              type.difficulty === 'easy' ? 'border-green-500/40 text-green-400 bg-green-500/10' :
+                              type.difficulty === 'hard' ? 'border-red-500/40 text-red-400 bg-red-500/10' :
+                              'border-amber-500/40 text-amber-400 bg-amber-500/10'
+                            }`}>{type.difficulty}</span>
+                          )}
+                          {type.duration && (
+                            <span className="text-xs px-2 py-0.5 rounded-full border border-blue-500/40 text-blue-400 bg-blue-500/10 font-medium">{type.duration}m</span>
+                          )}
+                          <span className="ml-auto flex items-center gap-1 text-amber-400 text-sm font-medium">
+                            Select <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                          </span>
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-700/60 p-8 text-center">
+                    <Building2 size={28} className="text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-400 text-sm font-medium">No custom interviews yet</p>
+                    <p className="text-slate-600 text-xs mt-1">Join an institution or ask your admin to create custom interview types for your branch.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -333,13 +444,79 @@ export default function StartInterviewPage() {
                   )}
                 </div>
 
+                {/* Resume Upload — mandatory for global types, optional but visible for institution types that require it */}
+                {(selectedType.isGlobal || selectedType.requireResume) && (
+                  <div className={`glass-card p-5 ${resumeError && !resumeText ? 'border border-red-500/50' : ''}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText size={16} className="text-green-400" />
+                      <p className="font-semibold text-white text-sm">Resume Upload</p>
+                      <span className="ml-auto text-xs text-red-400 font-medium">Required</span>
+                    </div>
+
+                    {resumeText ? (
+                      /* Uploaded successfully */
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-green-600/10 border border-green-500/30">
+                        <CheckCircle2 size={18} className="text-green-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-green-300 font-medium truncate">{resumeFile?.name}</p>
+                          <p className="text-xs text-slate-400">{Math.ceil(resumeText.length / 4)} tokens extracted</p>
+                        </div>
+                        <button onClick={clearResume} className="text-slate-500 hover:text-slate-300 transition-colors">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      /* Upload area */
+                      <label
+                        className={`flex flex-col items-center justify-center gap-2 p-5 rounded-xl border-2 border-dashed cursor-pointer transition-all ${
+                          resumeParsing
+                            ? 'border-purple-500/50 bg-purple-500/5'
+                            : 'border-slate-600 hover:border-purple-500/60 hover:bg-purple-500/5'
+                        }`}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".pdf,.txt"
+                          className="hidden"
+                          disabled={resumeParsing}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleResumeUpload(f);
+                          }}
+                        />
+                        {resumeParsing ? (
+                          <Loader2 size={24} className="animate-spin text-purple-400" />
+                        ) : (
+                          <Upload size={24} className="text-slate-400" />
+                        )}
+                        <p className="text-sm text-slate-300 font-medium">
+                          {resumeParsing ? 'Reading resume…' : 'Click to upload resume'}
+                        </p>
+                        <p className="text-xs text-slate-500">PDF or TXT · Max 5 MB</p>
+                      </label>
+                    )}
+
+                    {resumeError && !resumeText && (
+                      <div className="flex items-center gap-2 mt-2 text-xs text-red-400">
+                        <AlertCircle size={13} />
+                        {resumeError}
+                      </div>
+                    )}
+
+                    <p className="text-xs text-slate-500 mt-2">
+                      Your resume helps the interviewer ask personalised, relevant questions about your actual experience.
+                    </p>
+                  </div>
+                )}
+
                 {/* Start */}
                 <Button
                   onClick={handleStartInterview}
-                  disabled={loading}
-                  className="w-full h-12 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-xl text-base"
+                  disabled={loading || resumeParsing || ((selectedType.isGlobal || selectedType.requireResume) && !resumeText)}
+                  className="w-full h-12 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-xl text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Starting...' : 'Start Interview ->'}
+                  {loading ? 'Starting...' : (selectedType.isGlobal || selectedType.requireResume) && !resumeText ? 'Upload Resume to Continue' : 'Start Interview ->'}
                 </Button>
               </div>
             </div>

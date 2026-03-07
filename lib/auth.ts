@@ -3,10 +3,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GithubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "./prisma";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const prismaForAdapter = prisma as any;
 import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(prismaForAdapter),
   providers: [
     CredentialsProvider({
       name: "credentials",

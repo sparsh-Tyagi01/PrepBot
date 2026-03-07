@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, PlayCircle, BookOpen, X, ArrowRight, Globe, Building2, Pencil, Trash2, GitBranch, Layers } from "lucide-react";
+import { Plus, PlayCircle, BookOpen, X, ArrowRight, Globe, Building2, Pencil, Trash2, GitBranch, Layers, FileText } from "lucide-react";
 import Link from "next/link";
 
 interface InterviewType {
@@ -17,8 +17,9 @@ interface InterviewType {
   isGlobal: boolean;
   duration: number | null;
   difficulty: string | null;
-  branchId: string | null;
-  sectionId: string | null;
+  requireResume: boolean;
+  branches: { id: string; name: string; code: string }[];
+  sections: { id: string; name: string; code: string }[];
   _count: { questionBanks: number; interviewSessions: number };
 }
 
@@ -29,18 +30,106 @@ interface Branch {
   sections: { id: string; name: string; code: string }[];
 }
 
+function TargetingPicker({
+  branches,
+  branchIds,
+  sectionIds,
+  onChangeBranchIds,
+  onChangeSectionIds,
+}: {
+  branches: Branch[];
+  branchIds: string[];
+  sectionIds: string[];
+  onChangeBranchIds: (ids: string[]) => void;
+  onChangeSectionIds: (ids: string[]) => void;
+}) {
+  const availableSections = branches
+    .filter((b) => branchIds.includes(b.id))
+    .flatMap((b) => b.sections);
+
+  const toggleBranch = (id: string) => {
+    const next = branchIds.includes(id)
+      ? branchIds.filter((x) => x !== id)
+      : [...branchIds, id];
+    onChangeBranchIds(next);
+  };
+
+  const toggleSection = (id: string) => {
+    const next = sectionIds.includes(id)
+      ? sectionIds.filter((x) => x !== id)
+      : [...sectionIds, id];
+    onChangeSectionIds(next);
+  };
+
+  return (
+    <div className="space-y-3 border border-slate-700 rounded-xl p-3">
+      <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
+        <GitBranch size={12} /> Audience Targeting
+        <span className="text-slate-500 font-normal">
+          (optional — visible to all if not set)
+        </span>
+      </p>
+      <div className="space-y-2">
+        <p className="text-xs text-slate-500">Branches</p>
+        <div className="flex flex-wrap gap-2">
+          {branches.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => toggleBranch(b.id)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                branchIds.includes(b.id)
+                  ? "bg-cyan-600/20 border-cyan-500 text-cyan-300"
+                  : "bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500"
+              }`}
+            >
+              {b.name}{" "}
+              <span className="opacity-60">({b.code})</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {availableSections.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-500">
+            Sections{" "}
+            <span className="opacity-60">(from selected branches)</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {availableSections.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => toggleSection(s.id)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                  sectionIds.includes(s.id)
+                    ? "bg-purple-600/20 border-purple-500 text-purple-300"
+                    : "bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500"
+                }`}
+              >
+                {s.name}{" "}
+                <span className="opacity-60">({s.code})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function InstitutionInterviewsPage() {
   const [types, setTypes] = useState<InterviewType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", icon: "📋", duration: "", difficulty: "", branchId: "", sectionId: "" });
+  const [form, setForm] = useState({ name: "", description: "", icon: "📋", duration: "", difficulty: "", requireResume: false, branchIds: [] as string[], sectionIds: [] as string[] });
   const [error, setError] = useState("");
   const [branches, setBranches] = useState<Branch[]>([]);
 
   // Edit state
   const [editingType, setEditingType] = useState<InterviewType | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", description: "", icon: "📋", duration: "", difficulty: "" });
+  const [editForm, setEditForm] = useState({ name: "", description: "", icon: "📋", duration: "", difficulty: "", requireResume: false, branchIds: [] as string[], sectionIds: [] as string[] });
   const [editError, setEditError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -79,14 +168,23 @@ export default function InstitutionInterviewsPage() {
     }
 
     setTypes((prev) => [data.interviewType, ...prev]);
-    setForm({ name: "", description: "", icon: "📋", duration: "", difficulty: "", branchId: "", sectionId: "" });
+    setForm({ name: "", description: "", icon: "📋", duration: "", difficulty: "", requireResume: false, branchIds: [], sectionIds: [] });
     setShowForm(false);
     setCreating(false);
   };
 
   const openEdit = (type: InterviewType) => {
     setEditingType(type);
-    setEditForm({ name: type.name, description: type.description ?? "", icon: type.icon ?? "📋", duration: type.duration ? String(type.duration) : "", difficulty: type.difficulty ?? "" });
+    setEditForm({
+      name: type.name,
+      description: type.description ?? "",
+      icon: type.icon ?? "📋",
+      duration: type.duration ? String(type.duration) : "",
+      difficulty: type.difficulty ?? "",
+      requireResume: type.requireResume,
+      branchIds: type.branches.map(b => b.id),
+      sectionIds: type.sections.map(s => s.id),
+    });
     setEditError("");
   };
 
@@ -226,6 +324,37 @@ export default function InstitutionInterviewsPage() {
                   </div>
                   <p className="text-xs text-slate-500">Fix the difficulty — students won&apos;t be able to change it.</p>
                 </div>
+                {/* Resume Upload Toggle (edit) */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <FileText size={15} className="text-green-400" />
+                    <div>
+                      <p className="text-sm font-medium text-white">Require Resume Upload</p>
+                      <p className="text-xs text-slate-500">Students must upload their resume before starting this interview.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, requireResume: !editForm.requireResume })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      editForm.requireResume ? 'bg-green-600' : 'bg-slate-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                      editForm.requireResume ? 'translate-x-4' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+                {/* Audience Targeting (edit) */}
+                {branches.length > 0 && (
+                  <TargetingPicker
+                    branches={branches}
+                    branchIds={editForm.branchIds}
+                    sectionIds={editForm.sectionIds}
+                    onChangeBranchIds={(ids) => setEditForm({ ...editForm, branchIds: ids, sectionIds: editForm.sectionIds.filter(sid => branches.filter(b => ids.includes(b.id)).flatMap(b => b.sections).some(s => s.id === sid)) })}
+                    onChangeSectionIds={(ids) => setEditForm({ ...editForm, sectionIds: ids })}
+                  />
+                )}
                 <div className="flex gap-2">
                   <Button type="submit" className="bg-blue-600 hover:bg-blue-500" disabled={saving}>
                     {saving ? "Saving..." : "Save Changes"}
@@ -317,40 +446,36 @@ export default function InstitutionInterviewsPage() {
                 </div>
                 <p className="text-xs text-slate-500">Fix the difficulty — students won&apos;t be able to change it.</p>
               </div>
-              {/* Targeting: branch / section */}
-              {branches.length > 0 && (
-                <div className="space-y-3 border border-slate-700 rounded-xl p-3">
-                  <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                    <GitBranch size={12} /> Audience Targeting <span className="text-slate-500 font-normal">(optional — visible to all if not set)</span>
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs text-slate-400">Branch</label>
-                      <select
-                        value={form.branchId}
-                        onChange={(e) => setForm({ ...form, branchId: e.target.value, sectionId: "" })}
-                        className="w-full h-9 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-sm px-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">All branches</option>
-                        {branches.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-slate-400">Section</label>
-                      <select
-                        value={form.sectionId}
-                        onChange={(e) => setForm({ ...form, sectionId: e.target.value })}
-                        disabled={!form.branchId}
-                        className="w-full h-9 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-sm px-2 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-40"
-                      >
-                        <option value="">All sections</option>
-                        {branches.find((b) => b.id === form.branchId)?.sections.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-                        ))}
-                      </select>
-                    </div>
+              {/* Resume Upload Toggle (create) */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700">
+                <div className="flex items-center gap-2">
+                  <FileText size={15} className="text-green-400" />
+                  <div>
+                    <p className="text-sm font-medium text-white">Require Resume Upload</p>
+                    <p className="text-xs text-slate-500">Students must upload their resume before starting this interview.</p>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, requireResume: !form.requireResume })}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    form.requireResume ? 'bg-green-600' : 'bg-slate-600'
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    form.requireResume ? 'translate-x-4' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+              {/* Targeting: branch / section */}
+              {branches.length > 0 && (
+                <TargetingPicker
+                  branches={branches}
+                  branchIds={form.branchIds}
+                  sectionIds={form.sectionIds}
+                  onChangeBranchIds={(ids) => setForm({ ...form, branchIds: ids, sectionIds: form.sectionIds.filter(sid => branches.filter(b => ids.includes(b.id)).flatMap(b => b.sections).some(s => s.id === sid)) })}
+                  onChangeSectionIds={(ids) => setForm({ ...form, sectionIds: ids })}
+                />
               )}
               <Button type="submit" className="bg-blue-600 hover:bg-blue-500" disabled={creating}>
                 {creating ? "Creating..." : "Create Interview Type"}
@@ -453,23 +578,25 @@ export default function InstitutionInterviewsPage() {
                       </Badge>
                     </div>
                   )}
-                  {(type.branchId || type.sectionId) && (
+                  {type.requireResume && (
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <Badge variant="outline" className="border-green-500/40 text-green-400 text-xs gap-1">
+                        <FileText size={10} /> Resume Required
+                      </Badge>
+                    </div>
+                  )}
+                  {(type.branches.length > 0 || type.sections.length > 0) && (
                     <div className="flex items-center gap-1 flex-wrap mb-3">
-                      {type.branchId && (
-                        <Badge variant="outline" className="text-xs border-cyan-500/40 text-cyan-400 gap-1">
-                          <GitBranch size={10} />
-                          {branches.find((b) => b.id === type.branchId)?.name ?? "Branch"}
+                      {type.branches.map((b) => (
+                        <Badge key={b.id} variant="outline" className="text-xs border-cyan-500/40 text-cyan-400 gap-1">
+                          <GitBranch size={10} />{b.name}
                         </Badge>
-                      )}
-                      {type.sectionId && (() => {
-                        const branch = branches.find((b) => b.id === type.branchId);
-                        const section = branch?.sections.find((s) => s.id === type.sectionId);
-                        return section ? (
-                          <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-400 gap-1">
-                            <Layers size={10} /> {section.name}
-                          </Badge>
-                        ) : null;
-                      })()}
+                      ))}
+                      {type.sections.map((s) => (
+                        <Badge key={s.id} variant="outline" className="text-xs border-purple-500/40 text-purple-400 gap-1">
+                          <Layers size={10} />{s.name}
+                        </Badge>
+                      ))}
                     </div>
                   )}
                   <Link href={`/institution/question-banks?typeId=${type.id}`}>

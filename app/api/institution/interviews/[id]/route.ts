@@ -38,21 +38,51 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { name, description, icon, duration, difficulty } = body;
+    const { name, description, icon, duration, difficulty, requireResume, branchIds, sectionIds } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    const interviewType = await prisma.interviewType.update({
-      where: { id },
-      data: { name, description, icon: icon || "📋", duration: duration ? Number(duration) : null, difficulty: difficulty || null },
-      include: {
-        _count: { select: { questionBanks: true, interviewSessions: true } },
-      },
+    const branchArr: string[] = Array.isArray(branchIds) ? branchIds.filter(Boolean) : [];
+    const sectionArr: string[] = Array.isArray(sectionIds) ? sectionIds.filter(Boolean) : [];
+
+    // Replace branch/section targeting in a transaction
+    const interviewType = await prisma.$transaction(async (tx) => {
+      await tx.interviewTypeBranch.deleteMany({ where: { interviewTypeId: id } });
+      await tx.interviewTypeSection.deleteMany({ where: { interviewTypeId: id } });
+
+      return tx.interviewType.update({
+        where: { id },
+        data: {
+          name,
+          description: description || null,
+          icon: icon || "📋",
+          duration: duration ? Number(duration) : null,
+          difficulty: difficulty || null,
+          requireResume: requireResume === true,
+          branches: branchArr.length
+            ? { create: branchArr.map((branchId) => ({ branchId })) }
+            : undefined,
+          sections: sectionArr.length
+            ? { create: sectionArr.map((sectionId) => ({ sectionId })) }
+            : undefined,
+        },
+        include: {
+          _count: { select: { questionBanks: true, interviewSessions: true } },
+          branches: { select: { branch: { select: { id: true, name: true, code: true } } } },
+          sections: { select: { section: { select: { id: true, name: true, code: true } } } },
+        },
+      });
     });
 
-    return NextResponse.json({ interviewType });
+    const shaped = {
+      ...interviewType,
+      branches: interviewType.branches.map(b => b.branch),
+      sections: interviewType.sections.map(s => s.section),
+    };
+
+    return NextResponse.json({ interviewType: shaped });
   } catch (error) {
     console.error("Update interview type error:", error);
     return NextResponse.json({ error: "Failed to update interview type" }, { status: 500 });

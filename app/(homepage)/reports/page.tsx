@@ -395,22 +395,37 @@ function ReportsPageContent() {
   const generateReportForSession = async (sid: string) => {
     setGeneratingReport(true);
     setReportError(null);
-    try {
-      const res = await fetch(`/api/interview-session/${sid}/generate-report`, { method: 'POST' });
-      if (res.ok) {
-        const report = await res.json();
-        setReports(prev => {
-          const without = prev.filter(r => r.interviewSessionId !== sid);
-          return [report, ...without];
-        });
-        setSelectedReport(report);
-      } else {
+    // Retry up to 4 times with increasing delay to handle DB propagation lag
+    const MAX_RETRIES = 4;
+    const RETRY_DELAYS = [0, 2000, 4000, 6000];
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      if (RETRY_DELAYS[attempt] > 0) {
+        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+      }
+      try {
+        const res = await fetch(`/api/interview-session/${sid}/generate-report`, { method: 'POST' });
+        if (res.ok) {
+          const report = await res.json();
+          setReports(prev => {
+            const without = prev.filter(r => r.interviewSessionId !== sid);
+            return [report, ...without];
+          });
+          setSelectedReport(report);
+          setGeneratingReport(false);
+          return;
+        }
         let msg = '';
         try { const t = await res.text(); msg = JSON.parse(t)?.error ?? t; } catch {}
+        // If session not completed yet, retry; otherwise surface the error
+        const notReady = res.status === 400 && msg.toLowerCase().includes('not completed');
+        if (notReady && attempt < MAX_RETRIES - 1) continue;
         setReportError(msg || (res.status === 429 ? 'AI quota exceeded — please wait and try again.' : 'Failed to generate report. Please try again.'));
+        break;
+      } catch {
+        if (attempt === MAX_RETRIES - 1) setReportError('Network error — could not reach the server.');
       }
-    } catch { setReportError('Network error — could not reach the server.'); }
-    finally { setGeneratingReport(false); }
+    }
+    setGeneratingReport(false);
   };
 
   const filtered = reports.filter(r => {
