@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { PDFParse } from 'pdf-parse';
+import { resolve } from 'path';
+import { pathToFileURL } from 'url';
+
+// Configure the pdfjs worker once at module load (Node.js server-side)
+const workerPath = resolve(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
+PDFParse.setWorker(pathToFileURL(workerPath).toString());
 
 // POST /api/resume/parse — accepts multipart/form-data with a 'file' field
 // Returns { text: string } with the extracted plain text from the resume
@@ -41,22 +48,11 @@ export async function POST(request: NextRequest) {
     if (fileType === 'text/plain' || fileName.endsWith('.txt')) {
       text = buffer.toString('utf-8');
     } else {
-      // PDF — use pdfjs-dist (already in the dependency tree) to extract text server-side
-      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-      // Disable the worker for server-side parsing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (pdfjs as any).GlobalWorkerOptions = { workerSrc: '' };
-      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) });
-      const doc = await loadingTask.promise;
-      const pages: string[] = [];
-      for (let i = 1; i <= doc.numPages; i++) {
-        const page = await doc.getPage(i);
-        const content = await page.getTextContent();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pageText = content.items.map((item: any) => item.str ?? '').join(' ');
-        pages.push(pageText);
-      }
-      text = pages.join('\n');
+      // PDF — use pdf-parse for server-side text extraction
+      const parser = new PDFParse({ data: buffer });
+      const result = await parser.getText();
+      await parser.destroy();
+      text = result.text;
     }
 
     // Trim excessive whitespace
