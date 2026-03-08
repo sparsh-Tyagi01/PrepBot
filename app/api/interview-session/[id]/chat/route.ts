@@ -143,6 +143,7 @@ function buildSystemPrompt(s: {
     `14. SYSTEM_TIME_WARNING_5 trigger: The interview is nearing its end — adjust your pacing naturally like a real interviewer would. Do NOT mention time or the clock. Simply transition smoothly: wrap up the current topic and move to the single most important remaining question. Keep your response natural and brief.\n` +
     `15. SYSTEM_TIME_WARNING_2 trigger: Almost out of time — do NOT say how many minutes are left. Naturally signal that you are wrapping up: ask one final, concise question that will round off the interview well. Example tone: "Before we finish, I'd like to ask you one last thing..." No mention of time.\n` +
     `16. SYSTEM_TIME_WARNING_1 trigger: Time is essentially up. Do NOT ask any new question and do NOT mention time. Deliver a natural, warm closing as any real interviewer would — thank the candidate, give a brief positive closing remark, and say goodbye. 2–3 sentences max.` +
+    `\n\n17. NATURAL EARLY END: If you genuinely feel the interview has reached a natural conclusion — all key areas assessed, a satisfying set of questions and answers exchanged, or there is nothing more meaningful left to cover — you may close the session early. Deliver a warm, professional closing (thank the candidate, brief overall impression, next steps). Then append the exact token [END_INTERVIEW] on its own at the very end, after your last sentence. Do NOT use this after just 1–2 questions. Only when the interview is truly complete.` +
     timePacing
   );
 }
@@ -239,9 +240,13 @@ export async function POST(
       await callGemini(apiKey, buildSystemPrompt(iv, timeRemainingSeconds, institutionQuestions.length > 0 ? institutionQuestions : undefined, iv.resumeText ?? null), history, toSend)
     ) || 'Could you tell me a bit more about your background?';
 
-    // Detect and strip misbehavior action tokens
+    // Detect and strip misbehavior/end action tokens
     let misbehaviorAction: 'warn' | 'end' | null = null;
-    if (aiText.includes('[END_MISBEHAVIOR]')) {
+    let earlyEnd = false;
+    if (aiText.includes('[END_INTERVIEW]')) {
+      earlyEnd = true;
+      aiText = aiText.replace('[END_INTERVIEW]', '').trim();
+    } else if (aiText.includes('[END_MISBEHAVIOR]')) {
       misbehaviorAction = 'end';
       aiText = aiText.replace('[END_MISBEHAVIOR]', '').trim();
     } else if (aiText.includes('[WARN_MISBEHAVIOR]')) {
@@ -256,7 +261,7 @@ export async function POST(
       data: { conversationLog: log },
     });
 
-    return NextResponse.json({ message: aiText, conversationLog: log, misbehaviorAction });
+    return NextResponse.json({ message: aiText, conversationLog: log, misbehaviorAction, earlyEnd });
   } catch (error: any) {
     console.error('Chat error:', error);
     // Surface quota / auth errors with their real HTTP status

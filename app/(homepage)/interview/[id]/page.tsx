@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Clock, Code, PhoneOff, Video, VideoOff, Mic, X,
-  Send, ChevronUp, ChevronDown, Loader2, MessagesSquare,
+  Clock, Code, PhoneOff, Video, VideoOff, Volume2, X,
+  Send, ChevronDown, Loader2, MessagesSquare,
 } from 'lucide-react';
 import CodeEditor from '@/components/CodeEditor';
 import AIAvatar from '@/components/AIAvatar';
@@ -73,6 +73,7 @@ export default function LiveInterviewPage() {
   const hasRedirectedRef = useRef(false);
   const silenceTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeRemainingRef = useRef(0);
+  const initPhaseRef     = useRef(false); // true while waiting for first AI question after greeting
 
   // Audio unlock gate — browser blocks TTS unless called from a direct user gesture
   const [readyToStart, setReadyToStart] = useState(false);
@@ -227,21 +228,22 @@ export default function LiveInterviewPage() {
   };
 
   const initializeInterview = async (data: InterviewSession) => {
+    const shortGreeting = `Hi, I'm ${data.aiInterviewer.name}. Let's get started.`;
     const greeting: ConversationMessage = {
       speaker: 'ai',
-      message: data.aiInterviewer.greetingMessage,
+      message: shortGreeting,
       type: 'text',
       timestamp: new Date().toISOString(),
     };
     setConversationLog([greeting]);
-    setCurrentAIMessage(greeting.message);
+    setCurrentAIMessage(shortGreeting);
     setIsAISpeaking(true);
+    initPhaseRef.current = true; // onSpeakingComplete will call sendInitialQuestion
     await fetch(`/api/interview-session/${sessionId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversationLog: [greeting] }),
     });
-    setTimeout(sendInitialQuestion, 5000);
   };
 
   const sendInitialQuestion = async () => {
@@ -344,21 +346,15 @@ export default function LiveInterviewPage() {
             }
           }
         }
-        // If the AI terminated due to misbehavior, let the AI finish speaking then end
-        if (data.misbehaviorAction === 'end') {
+        // If the AI terminated the interview (misbehavior or natural early end), wrap up
+        if (data.misbehaviorAction === 'end' || data.earlyEnd) {
           autoListenRef.current = false;
           isEndingRef.current = true;
           setIsEnding(true);
           recognitionRef.current?.stop?.();
           setTimeout(doRedirect, 10000); // fallback redirect if TTS doesn't fire
-        } else {
-          // Auto-start listening right after state settles
-          if (autoListenRef.current && !isEndingRef.current) {
-            setTimeout(() => {
-              if (!isEndingRef.current) startListening();
-            }, 200);
-          }
         }
+        // mic will be restarted by onSpeakingComplete once AI finishes talking
         setCodeAnswer('');
       } else {
         const errMsg = (await readErrorBody(res)) || (res.status === 429
@@ -375,7 +371,19 @@ export default function LiveInterviewPage() {
   useEffect(() => { submitAnswerRef.current = submitAnswer; }, [submitAnswer]);
 
   // Sync boolean states to refs so async closures always read latest value
-  useEffect(() => { isAISpeakingRef.current = isAISpeaking; }, [isAISpeaking]);
+  useEffect(() => {
+    isAISpeakingRef.current = isAISpeaking;
+    // When AI starts speaking: stop mic + clear any accumulated transcript so AI's TTS
+    // isn't picked up and echo-submitted back as user input.
+    if (isAISpeaking) {
+      stopListening();
+      accumulatedRef.current = '';
+      setFinalTranscript('');
+      setInterimTranscript('');
+      if (speechSilenceTimer.current) { clearTimeout(speechSilenceTimer.current); speechSilenceTimer.current = null; }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAISpeaking]);
   useEffect(() => { isWaitingForAIRef.current = isWaitingForAI; }, [isWaitingForAI]);
 
   // Proactively notify the AI when time crosses 5 min / 2 min / 1 min thresholds
@@ -432,15 +440,15 @@ export default function LiveInterviewPage() {
       }
 
       // Auto-submit: reset the silence timer on every speech event.
-      // If the user stops speaking for 3 s after saying something, submit automatically.
+      // If the user stops speaking for 1.5 s (and AI is not speaking), submit automatically.
       if (speechSilenceTimer.current) clearTimeout(speechSilenceTimer.current);
       if (accumulatedRef.current.trim()) {
         speechSilenceTimer.current = setTimeout(() => {
           const answer = accumulatedRef.current.trim();
-          if (answer && isRecordingRef.current && !isEndingRef.current) {
+          if (answer && isRecordingRef.current && !isEndingRef.current && !isAISpeakingRef.current) {
             submitAnswerRef.current?.(answer, 'text');
           }
-        }, 3000);
+        }, 1500);
       }
     };
     r.onerror = (e: any) => {
@@ -485,7 +493,11 @@ export default function LiveInterviewPage() {
     if (isRecordingRef.current) {
       stopListening();
     } else {
-      if (isAISpeaking) return;
+      // If AI is speaking, interrupt it so user can talk
+      if (isAISpeakingRef.current) {
+        setIsAISpeaking(false);
+        isAISpeakingRef.current = false;
+      }
       startListening();
     }
   };
@@ -617,116 +629,158 @@ export default function LiveInterviewPage() {
             onSpeakingComplete={() => {
               setIsAISpeaking(false);
               if (isEndingRef.current) { doRedirect(); return; }
+              // After greeting, trigger the first real question
+              if (initPhaseRef.current) { initPhaseRef.current = false; sendInitialQuestion(); return; }
               // Auto-start mic once AI finishes speaking
-              if (autoListenRef.current) setTimeout(() => startListening(), 300);
+              if (autoListenRef.current) setTimeout(() => startListening(), 100);
             }}
           />
-
+          {/* Tap-to-interrupt overlay shown while AI is speaking */}
+          {isAISpeaking && (
+            <button
+              onClick={() => {
+                setIsAISpeaking(false);
+                isAISpeakingRef.current = false;
+                accumulatedRef.current = '';
+                setFinalTranscript('');
+                setInterimTranscript('');
+                setTimeout(() => startListening(), 80);
+              }}
+              className="absolute inset-0 z-10 flex items-end justify-center pb-24 cursor-pointer group"
+            >
+              <div className="px-4 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur-sm
+                               text-xs text-white/40 group-hover:text-white/80 group-hover:bg-black/60 transition-all">
+                tap to interrupt
+              </div>
+            </button>
+          )}
         </div>
 
         {/* User PiP - fixed bottom-right */}
-        <div className="absolute bottom-28 right-5 w-52 aspect-video rounded-xl overflow-hidden
-                         shadow-2xl border border-white/10 z-20">
+        <div className={`absolute bottom-24 right-5 w-48 aspect-video rounded-xl overflow-hidden
+                         shadow-2xl border z-20 transition-all duration-300
+                         ${ isRecording && (finalTranscript || interimTranscript)
+                           ? 'border-green-400/70 shadow-green-500/20 shadow-lg'
+                           : 'border-white/10' }`}>
           <UserVideo
             isVideoOn={isVideoOn}
             isAudioOn={true}
             onToggleVideo={() => setIsVideoOn(v => !v)}
             onToggleAudio={() => {}}
           />
+          {/* Speaking indicator badge on user PiP */}
+          {isRecording && (finalTranscript || interimTranscript) && (
+            <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 px-2 py-0.5 rounded-full
+                             bg-green-500/80 backdrop-blur-sm text-[10px] text-white font-medium">
+              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              Speaking
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Mic area (center-bottom) — main interaction ── */}
-      <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center pb-6 pt-2
-                       bg-linear-to-t from-black/90 via-black/60 to-transparent pointer-events-none">
+      {/* ── Bottom control bar ── */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
 
-        {/* Transcript bubble */}
+        {/* Live transcript strip — floats above bar */}
         {(finalTranscript || interimTranscript) && (
-          <div className="mb-3 max-w-xl w-[90%] pointer-events-auto">
-            <div className="px-4 py-2.5 rounded-2xl bg-slate-800/90 backdrop-blur-sm border border-slate-600 text-sm text-white">
-              {finalTranscript}
-              <span className="text-slate-400 italic">{interimTranscript}</span>
+          <div className="px-4 mb-1 pointer-events-none">
+            <div className="mx-auto max-w-2xl px-4 py-2 rounded-2xl bg-slate-900/90 backdrop-blur-sm
+                             border border-white/10 text-sm text-white flex items-start gap-2 shadow-lg">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 shrink-0 animate-pulse" />
+              <p className="leading-snug flex-1 min-w-0 wrap-break-word">
+                {finalTranscript}
+                <span className="text-slate-400 italic">{interimTranscript}</span>
+              </p>
+              {/* Manual send fallback */}
+              {finalTranscript.trim() && !isWaitingForAI && (
+                <button
+                  onClick={() => submitAnswer(finalTranscript, 'text')}
+                  className="pointer-events-auto shrink-0 p-1 rounded-lg bg-green-600/80 hover:bg-green-600 transition-colors"
+                >
+                  <Send size={14} className="text-white" />
+                </button>
+              )}
             </div>
           </div>
         )}
 
-        {/* Controls row */}
-        <div className="flex items-center gap-3 pointer-events-auto">
-          {/* Camera */}
-          <button
-            onClick={() => setIsVideoOn(v => !v)}
-            className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all
-              ${isVideoOn ? 'bg-slate-800/80 border-slate-600 hover:border-slate-500' : 'bg-red-600/80 border-red-500'}`}
-          >
-            {isVideoOn ? <Video size={20} className="text-white" /> : <VideoOff size={20} className="text-white" />}
-          </button>
+        {/* Main control bar */}
+        <div className="flex items-center justify-between px-6 py-3 bg-slate-950/85 backdrop-blur-xl
+                         border-t border-white/5 pointer-events-auto">
 
-          {/* ★ Main MIC button — tap to manually stop/start */}
-          <div className="flex flex-col items-center gap-1">
+          {/* Left: camera + ambient mic status */}
+          <div className="flex items-center gap-3 w-52">
             <button
-              onClick={toggleRecording}
-              disabled={isAISpeaking || isWaitingForAI}
-              className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200 shadow-xl
-                ${isRecording
-                  ? 'bg-red-600 border-2 border-red-400 record-pulse scale-110'
-                  : isAISpeaking || isWaitingForAI
-                    ? 'bg-slate-700/50 border border-slate-600 opacity-50 cursor-not-allowed'
-                    : 'bg-linear-to-br from-purple-600 to-blue-600 border-2 border-purple-400/50 hover:scale-105 glow-purple'
-                }`}
+              onClick={() => setIsVideoOn(v => !v)}
+              className={`w-11 h-11 rounded-full flex items-center justify-center border transition-all
+                ${isVideoOn ? 'bg-slate-800 border-slate-600 hover:border-slate-500' : 'bg-red-600/80 border-red-500'}`}
             >
-              <Mic size={32} className="text-white" />
+              {isVideoOn ? <Video size={18} className="text-white" /> : <VideoOff size={18} className="text-white" />}
             </button>
-            <span className="text-xs text-slate-400">
-              {isRecording
-                ? finalTranscript ? 'Submitting soon…' : 'Listening…'
-                : isAISpeaking ? 'AI speaking…'
-                : isWaitingForAI ? 'Processing…'
-                : 'Auto-listening'}
-            </span>
+
+            {/* Status pill */}
+            {isWaitingForAI ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300">
+                <Loader2 size={11} className="animate-spin" />
+                Thinking...
+              </div>
+            ) : isAISpeaking ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+                <Volume2 size={11} />
+                AI speaking
+              </div>
+            ) : isRecording ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs text-green-400">
+                <div className="flex items-end gap-px h-3">
+                  {[0, 0.15, 0.05, 0.2].map((delay, i) => (
+                    <div
+                      key={i}
+                      className="w-0.5 rounded-full bg-green-400 animate-pulse"
+                      style={{ height: `${50 + i * 15}%`, animationDelay: `${delay}s` }}
+                    />
+                  ))}
+                </div>
+                {finalTranscript || interimTranscript ? 'Speaking' : 'Listening'}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/60 border border-slate-700 text-xs text-slate-500">
+                <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                Mic ready
+              </div>
+            )}
           </div>
 
-          {/* Manual send — only visible when there's text (fallback) */}
-          {finalTranscript.trim() && !isWaitingForAI && (
-            <button
-              onClick={() => submitAnswer(finalTranscript, 'text')}
-              className="w-12 h-12 rounded-full flex items-center justify-center border transition-all bg-green-600/80 border-green-500 hover:bg-green-600"
-            >
-              <Send size={20} className="text-white" />
-            </button>
-          )}
-
-          {/* Code editor toggle */}
-          <button
-            onClick={() => setShowCodeEditor(c => !c)}
-            className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all
-              ${showCodeEditor
-                ? 'bg-blue-600/80 border-blue-500'
-                : 'bg-slate-800/80 border-slate-600 hover:border-slate-500'}`}
-          >
-            <Code size={20} className="text-white" />
-          </button>
-
-          {/* Transcript panel toggle */}
-          <button
-            onClick={() => setShowTranscript(t => !t)}
-            className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all
-              ${showTranscript
-                ? 'bg-purple-600/80 border-purple-500'
-                : 'bg-slate-800/80 border-slate-600 hover:border-slate-500'}`}
-          >
-            <MessagesSquare size={20} className="text-white" />
-          </button>
-
-          {/* End call */}
+          {/* Center: End Call */}
           <button
             onClick={handleEndInterview}
             disabled={isEnding}
-            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all border-2 shadow-lg ${
-              isEnding ? 'bg-slate-700 border-slate-600 opacity-50 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 border-red-500'
+            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all border-2 shadow-lg shadow-red-900/40 ${
+              isEnding
+                ? 'bg-slate-700 border-slate-600 opacity-50 cursor-not-allowed'
+                : 'bg-red-600 hover:bg-red-700 border-red-500 hover:scale-105 active:scale-95'
             }`}
           >
-            <PhoneOff size={22} className="text-white" />
+            <PhoneOff size={24} className="text-white" />
           </button>
+
+          {/* Right: utility controls */}
+          <div className="flex items-center gap-2 w-52 justify-end">
+            <button
+              onClick={() => setShowCodeEditor(c => !c)}
+              className={`w-11 h-11 rounded-full flex items-center justify-center border transition-all
+                ${showCodeEditor ? 'bg-blue-600/80 border-blue-500' : 'bg-slate-800 border-slate-600 hover:border-slate-500'}`}
+            >
+              <Code size={18} className="text-white" />
+            </button>
+            <button
+              onClick={() => setShowTranscript(t => !t)}
+              className={`w-11 h-11 rounded-full flex items-center justify-center border transition-all
+                ${showTranscript ? 'bg-purple-600/80 border-purple-500' : 'bg-slate-800 border-slate-600 hover:border-slate-500'}`}
+            >
+              <MessagesSquare size={18} className="text-white" />
+            </button>
+          </div>
         </div>
       </div>
 

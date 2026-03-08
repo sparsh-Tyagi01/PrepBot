@@ -119,11 +119,20 @@ Provide ONLY the JSON response, no additional text.`;
     
     const reportData = JSON.parse(jsonText);
 
-    // Create report in database
-    const report = await prisma.report.create({
-      data: {
+    // Create report in database — upsert guards against concurrent calls
+    const report = await prisma.report.upsert({
+      where: { interviewSessionId: id },
+      create: {
         userId: session.user.id,
         interviewSessionId: id,
+        overallScore: reportData.score || 0,
+        strengths: reportData.strengths || [],
+        weaknesses: reportData.weaknesses || [],
+        recommendations: reportData.recommendations || [],
+        detailedAnalysis: reportData.analysis || '',
+        skillBreakdown: reportData.skillBreakdown || {},
+      },
+      update: {
         overallScore: reportData.score || 0,
         strengths: reportData.strengths || [],
         weaknesses: reportData.weaknesses || [],
