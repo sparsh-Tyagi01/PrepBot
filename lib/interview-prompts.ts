@@ -123,10 +123,10 @@ export function buildSystemPrompt(
       `\n\nCANDIDATE RESUME — use this to personalise every question. Reference specific projects, skills, experiences, and technologies mentioned. Do NOT ask things that are already clearly answered by the resume; instead probe deeper into them.\n\n${resumeText.trim()}`;
   }
 
-  // Initial turn instruction (for Vapi - greeting already happened)
+  // Initial turn instruction
   const initialTurnInstruction = isInitialTurn
-    ? `\n\n11. INITIAL_TURN: This is the start of the interview. You have already greeted the candidate. Ask your FIRST real interview question immediately. Do NOT say hello again or introduce yourself.`
-    : `\n\n11. SYSTEM_INIT trigger: Skip greetings. Ask your FIRST real question immediately.`;
+    ? `\n\n11. INITIAL_TURN: This is the very start of the interview. Begin with a brief, warm greeting introducing yourself (e.g., "Hi, I'm ${s.aiInterviewer.name}. Thanks for joining me today for this ${t}.") then immediately follow with your FIRST real interview question in the same response. Keep the greeting to one sentence, then ask your question. Do NOT wait for a response before asking.`
+    : `\n\n11. Do NOT greet or introduce yourself again - you have already done so at the start. Just continue the interview naturally.`;
 
   return (
     `You are ${s.aiInterviewer.name}, a highly experienced interviewer at a top-tier tech company conducting a REAL face-to-face interview.` +

@@ -23,7 +23,6 @@
     "@prisma/client": "^7.4.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/pdf-parse": "^1.1.5",
-    "@vapi-ai/web": "^2.5.2",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -39,7 +38,6 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
-    "simli-client": "^3.0.1",
     "tailwind-merge": "^3.4.1"
   },
   "devDependencies": {
